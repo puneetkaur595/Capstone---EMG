@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>EMG Traffic Plan Designer</title>
+
+        <!-- Parsers -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+        <link href="style.css" rel="stylesheet" />
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🚧 EMG Traffic Plan Designer</h1>
+                <p>Select a traffic plan layout and drag signs to create your custom traffic control plan</p>
+            </div>
+
+            <div class="main-grid">
+                <div class="sign-library">
+                    <h2>📋 Sign Library (<span id="signTotal">0</span>)</h2>
+                    <div class="search-box">
+                        <input id="searchBox" placeholder="🔍 Search signs..." />
+                    </div>
+                    <div id="signList">
+                        <div class="loading">
+                            <div class="loading-spinner"></div>
+                            Loading signs...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="canvas-container">
+                    <div class="controls">
+                        <select id="planSelect">
+                            <option value="">Select Traffic Plan Layout...</option>
+                        </select>
+
+                        <button class="btn-save" onclick="savePlan()">💾 Save Plan</button>
+                        <button class="btn-clear" onclick="clearAll()">🗑️ Clear All</button>
+
+                        <div class="sign-count"><span id="signCount">0</span> signs placed</div>
+                    </div>
+
+                    <div id="canvas">
+                        <div class="empty-canvas">
+                            <p style="font-size:17px;font-weight:600">👈 Select a traffic plan above</p>
+                            <p style="font-size:13px;margin-top:8px">Then drag signs from the library</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <script>
+        /* ---------------------------
+        Google Sheets Configuration
+        These IDs connect to the EMG traffic sign database
+        --------------------------- */
+        const GOOGLE_SHEET_ID = '11tHHhooqQ7tE1sbXQA_hVZKk2WIOoTqGQqQnqwF2kxI';
+        const SIGNS_SHEET = 'Signs';
+        const LAYOUTS_SHEET = 'Typical Layout Library';
+
+        /* ---------------------------
+        Application State Variables
+        Keep track of what's happening in the app
+        --------------------------- */
+        let placedSigns = []; // All signs that user has placed on the canvas
+        let draggedSign = null; // The sign being dragged right now
+        let allSigns = []; // Complete list of available traffic signs
+        let allLayouts = [];  // All traffic plan layouts we can choose from
+
+        /* ---------------------------
+        Google Drive Image Helpers
+        These functions handle Google Drive image URLs
+        --------------------------- */
+
+        // Convert a Google Drive file ID into a viewable image URL
+        function getDriveImageUrl(fileId) {
+            if (!fileId) return null;
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+
+        // Extract the file ID from any Google Drive URL format
+        function extractDriveFileId(url) {
+            if (!url) return null;
+            url = url.toString().trim();
+
+            // Try different URL patterns that Google Drive uses
+            const patterns = [
+                /\/d\/([a-zA-Z0-9_-]+)/,
+                /id=([a-zA-Z0-9_-]+)/,
+                /open\?id=([a-zA-Z0-9_-]+)/,
+                /uc\?export=view&id=([a-zA-Z0-9_-]+)/
+            ];
+
+            // Check each pattern to find a match
+            for (const p of patterns) {
+                const m = url.match(p);
+                if (m && m[1]) return m[1];
+            }
+
+            // Last resort: look for any long string that might be a file ID
+            const fallback = url.match(/([a-zA-Z0-9_-]{20,})/);
+            return fallback ? fallback[1] : null;
+        }
+
+        /* ---------------------------
+        Data Parsing Helpers
+        Convert spreadsheet data into usable objects
+        --------------------------- */
+
+        // Clean up column names to make them easier to match
+        // Removes spaces, underscores, and makes everything lowercase
+        function normalizeKey(k) {
+            return k ? k.toString().trim().replace(/\s+/g,'').replace(/_/g,'').toLowerCase() : '';
+        }
+
+        // Parse sign data from spreadsheet rows into sign objects
+        function parseSignRows(rows) {
+            const signs = [];
+            rows.forEach(row => {
+                // Create a map with normalized column names for easier access
+                const map = {};
+                Object.keys(row).forEach(k => {
+                    map[normalizeKey(k)] = row[k];
+                });
+
+                // Extract sign information from various possible column names
+                const id = map.signid || map.id || map.code;
+                const name = map.signname || map.name || map.description;
+                const category = map.category || map.type || '';
+                const province = map.province || '';
+                const fileIdCol = map.drivefileid || map.fileid || map.imagefile;
+                const driveLinkCol = map.drivewebviewlink || map.drivewebview || map.webviewlink || map.link;
+
+                // Skip this row if we don't have the essential info
+                if (!id || !name) return;
+
+                // Try to get the Google Drive file ID from either column
+                let finalId = null;
+                if (fileIdCol && fileIdCol.toString().trim() !== '') finalId = fileIdCol.toString().trim();
+                else if (driveLinkCol && driveLinkCol.toString().trim() !== '') finalId = extractDriveFileId(driveLinkCol);
+
+                // Skip if we couldn't find a valid file ID
+                if (!finalId) return;
+
+                // Add this sign to our collection
+                signs.push({
+                    id: id.toString().trim(),
+                    name: name.toString().trim(),
+                    category: category ? category.toString().trim() : '',
+                    province: province ? province.toString().trim() : '',
+                    url: getDriveImageUrl(finalId),
+                    fileId: finalId
+                });
+            });
+            return signs;
+        }
+
+        // Parse layout plan data from spreadsheet rows
+        function parseLayoutRows(rows) {
+            const layouts = [];
+            rows.forEach(row => {
+                // Create normalized column map
+                const map = {};
+                Object.keys(row).forEach(k => {
+                    map[normalizeKey(k)] = row[k];
+                });
+
+                // Extract layout information
+                const id = map.typicallayoutid || map.id || map.layoutid;
+                const title = map.typicallayouttitle || map.title || map.name;
+                const roadType = map.roadtype || map.type;
+                const planPhoto = map.planphoto || map.photo || map.image;
+
+                // Skip if missing essential information
+                if (!id || !title || !planPhoto) return;
+
+                // Add this layout to our collection
+                layouts.push({
+                    id: id.toString().trim(),
+                    title: title.toString().trim(),
+                    roadType: roadType ? roadType.toString().trim() : '',
+                    imageUrl: planPhoto.toString().trim()
+                });
+            });
+            return layouts;
+        }
+
+        /* ---------------------------
+        Load Data from Google Sheets
+        Fetches both signs and layout plans from the spreadsheet
+        --------------------------- */
+        async function loadFromGoogleSheets() {
+            try {
+                console.log('Loading data from Google Sheets...');
+                
+                // Load the Signs sheet
+                const signsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SIGNS_SHEET)}`;
+                const signsResponse = await fetch(signsUrl);
+                if (signsResponse.ok) {
+                    const signsText = await signsResponse.text();
+                    // Parse the CSV data using PapaParse library
+                    Papa.parse(signsText, {
+                        header: true, // First row contains column headers
+                        skipEmptyLines: true, // Ignore blank rows
+                        complete: function(results) {
+                            allSigns = parseSignRows(results.data);
+                            document.getElementById('signTotal').textContent = allSigns.length;
+                            loadSignLibrary(allSigns);
+                            console.log(`✅ Loaded ${allSigns.length} signs`);
+                        }
+                    });
+                }
+
+                // Load the Layout Plans sheet
+                const layoutsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(LAYOUTS_SHEET)}`;
+                const layoutsResponse = await fetch(layoutsUrl);
+                if (layoutsResponse.ok) {
+                    const layoutsText = await layoutsResponse.text();
+                    // Parse the layout plans CSV data
+                    Papa.parse(layoutsText, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            allLayouts = parseLayoutRows(results.data);
+                            populateLayoutDropdown(allLayouts);
+                            console.log(`✅ Loaded ${allLayouts.length} layouts`);
+                        }
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error loading from Google Sheets:', error);
+                document.getElementById('signList').innerHTML = `<div class="loading" style="color:#dc2626">⚠️ Error loading data</div>`;
+            }
+        }
+
+        /* ---------------------------
+        Populate Layout Dropdown Menu
+        Organizes traffic plan layouts by road type
+        --------------------------- */
+        function populateLayoutDropdown(layouts) {
+            const select = document.getElementById('planSelect');
+            select.innerHTML = '<option value="">Select Traffic Plan Layout...</option>';
+            
+            // Handle case where no layouts are available
+            if (!layouts || layouts.length === 0) {
+                select.innerHTML += '<option disabled>No layouts available</option>';
+                return;
+            }
+
+            // Group layouts by their road type for better organization
+            const grouped = {};
+            layouts.forEach(layout => {
+                const type = layout.roadType || 'Other';
+                if (!grouped[type]) grouped[type] = [];
+                grouped[type].push(layout);
+            });
+
+            // Create dropdown groups for each road type
+            Object.keys(grouped).sort().forEach(type => {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = type;
+                // Add each layout as an option under this road type
+                grouped[type].forEach(layout => {
+                    const option = document.createElement('option');
+                    option.value = layout.id;
+                    option.textContent = layout.title;
+                    option.dataset.imageUrl = layout.imageUrl;
+                    optgroup.appendChild(option);
+                });
+                select.appendChild(optgroup);
+            });
+        }
+
+        /* ---------------------------
+        Display Sign Library
+        Shows all available traffic signs in the sidebar
+        --------------------------- */
+        function loadSignLibrary(signs) {
+            const signList = document.getElementById('signList');
+            signList.innerHTML = '';
+
+            // Handle empty library
+            if (!signs || signs.length === 0) {
+                signList.innerHTML = '<div class="loading">No signs found</div>';
+                document.getElementById('signTotal').textContent = 0;
+                return;
+            }
+
+            // Update the sign count display
+            document.getElementById('signTotal').textContent = signs.length;
+
+            // Create a visual card for each traffic sign
+            signs.forEach(sign => {
+                const signDiv = document.createElement('div');
+                signDiv.className = 'sign-item';
+                signDiv.draggable = true; // Make it draggable to the canvas
+
+                // Create the sign image
+                const img = document.createElement('img');
+                img.alt = sign.id;
+                img.src = sign.url || '';
+                img.loading = 'lazy'; // Load images as user scrolls
+
+                // Handle image loading errors with fallback options
+                img.onerror = function() {
+                    if (sign.fileId) {
+                        // Try alternate Google Drive thumbnail URL
+                        this.src = `https://drive.google.com/thumbnail?id=${sign.fileId}&sz=w200`;
+                    } else {
+                        // Create a placeholder SVG if all else fails
+                        this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="50" height="50"%3E%3Crect fill="%23f8fafc" width="50" height="50" stroke="%23cbd5e1"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23475569" dy=".3em" font-size="7"%3E' + encodeURIComponent(sign.id) + '%3C/text%3E%3C/svg%3E';
+                    }
+                };
+                // Create the sign information section
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'sign-info';
+                infoDiv.innerHTML = `<div class="sign-id">${escapeHtml(sign.id)}</div>
+                                    <div class="sign-name">${escapeHtml(sign.name)}</div>
+                                    ${sign.category ? `<div class="sign-category">${escapeHtml(sign.category)}</div>` : ''}`;
+
+                signDiv.appendChild(img);
+                signDiv.appendChild(infoDiv);
+
+                // Set up drag behavior when user starts dragging the sign
+                signDiv.addEventListener('dragstart', (e) => {
+                    draggedSign = sign; // Remember which sign is being dragged
+                    try {
+                        // Store sign data for the drop event
+                        e.dataTransfer.setData('text/plain', JSON.stringify(sign));
+                    } catch (err) { }
+                    // Some browsers might restrict dataTransfer
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
+
+                signList.appendChild(signDiv);
+            });
+        }
+
+        /* ---------------------------
+        Canvas Setup & Drag/Drop Handling
+        Makes the canvas interactive for placing signs
+        --------------------------- */
+        
+        function setupCanvas() {
+            const canvas = document.getElementById('canvas');
+
+            // When user drags a sign over the canvas
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                canvas.classList.add('drag-over');
+            });
+
+            // When user drags away from canvas
+            canvas.addEventListener('dragleave', (e) => {
+                canvas.classList.remove('drag-over');
+            });
+
+            // When user drops a sign onto the canvas
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                canvas.classList.remove('drag-over');
+
+                // Try to get the sign data from the drop event
+                let sign = null;
+                try {
+                    const raw = e.dataTransfer.getData('text/plain');
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && parsed.id) sign = parsed;
+                    }
+                } catch (err) {
+                    // If parsing fails, we'll use the backup method below
+                }
+
+                // Fallback to the currently dragged sign if data transfer failed
+                if (!sign) sign = draggedSign;
+                if (!sign) return;
+
+                // Calculate where the sign was dropped on the canvas
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                addSign(sign, x, y);
+                draggedSign = null;
+            });
+
+            // When user selects a different traffic plan layout
+            document.getElementById('planSelect').addEventListener('change', updatePlan);
+
+            // Set up the search box to filter signs
+            document.getElementById('searchBox').addEventListener('input', (e) => {
+                const q = e.target.value.trim().toLowerCase();
+                // Filter signs based on search query
+                const filtered = allSigns.filter(s =>
+                    s.id.toLowerCase().includes(q) ||
+                    s.name.toLowerCase().includes(q) ||
+                    (s.category && s.category.toLowerCase().includes(q))
+                );
+                loadSignLibrary(filtered);
+            });
+        }
+
+        /* ---------------------------
+        Place Sign on Canvas
+        Adds a new sign to the traffic plan
+        --------------------------- */
+        function addSign(sign, x, y) {
+            // Create a unique ID for this specific sign instance
+            const signId = Date.now() + Math.floor(Math.random()*1000);
+            // Create a sign object with position and rotation data
+            const signData = { ...sign, x, y, rotation: 0, uniqueId: signId };
+            // Add to our list of placed signs
+            placedSigns.push(signData);
+            // Draw the sign on the canvas
+            renderSign(signData);
+            // Update the sign counter
+            updateCount();
+        }
+
+        /* ---------------------------
+        Draw Sign on Canvas
+        Creates the visual representation of a placed sign
+        --------------------------- */
+        function renderSign(signData) {
+            const canvas = document.getElementById('canvas');
+
+            // Create the main sign container
+            const signDiv = document.createElement('div');
+            signDiv.className = 'placed-sign';
+            signDiv.id = `sign-${signData.uniqueId}`;
+            signDiv.style.left = `${signData.x}px`;
+            signDiv.style.top = `${signData.y}px`;
+            signDiv.style.transform = `translate(-50%,-50%) rotate(${signData.rotation}deg)`;
+
+            // Create control buttons (rotate and remove)
+            const controls = document.createElement('div');
+            controls.className = 'sign-controls';
+            controls.innerHTML = `<button class="sign-btn btn-rotate" title="Rotate">↻</button>
+                                <button class="sign-btn btn-remove" title="Remove">×</button>`;
+
+            const img = document.createElement('img');
+            img.alt = signData.id;
+            img.src = signData.url;
+            img.onerror = function() {
+                if (signData.fileId) this.src = `https://drive.google.com/thumbnail?id=${signData.fileId}&sz=w200`;
+                else this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="70" height="70"%3E%3Crect fill="%23fef2f2" width="70" height="70" stroke="%23dc2626"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23dc2626" dy=".3em" font-size="20"%3E⚠️%3C/text%3E%3C/svg%3E';
+            };
+
+            // Create the sign image
+            const label = document.createElement('div');
+            label.className = 'sign-label';
+            label.textContent = signData.id;
+
+            // Wire up the control buttons
+            controls.querySelector('.btn-rotate').addEventListener('click', () => rotateSign(signData.uniqueId));
+            controls.querySelector('.btn-remove').addEventListener('click', () => removeSign(signData.uniqueId));
+            
+            // Assemble the sign element
+            signDiv.appendChild(controls);
+            signDiv.appendChild(img);
+            signDiv.appendChild(label);
+
+            // Set up dragging behavior to move the sign around the canvas
+            let isDragging = false, startX=0, startY=0;
+
+
+            signDiv.addEventListener('mousedown', (e) => {
+                // Don't start dragging if user clicked a button
+                if (e.target.closest('.sign-btn')) return;
+                isDragging = true;
+                const rect = canvas.getBoundingClientRect();
+                startX = e.clientX - rect.left - signData.x;
+                startY = e.clientY - rect.top - signData.y;
+                signDiv.style.cursor = 'grabbing';
+                e.preventDefault();  // Prevent text selection
+            });
+
+            // Prevent text selection
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const rect = canvas.getBoundingClientRect();
+                signData.x = e.clientX - rect.left - startX;
+                signData.y = e.clientY - rect.top - startY;
+                // Update position on screen    
+                signDiv.style.left = `${signData.x}px`;
+                signDiv.style.top = `${signData.y}px`;
+            });
+
+            // Update position on screen
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    signDiv.style.cursor = 'move';
+                }
+            });
+
+            // Add the sign to the canvas
+            canvas.appendChild(signDiv);
+        }
+
+        /* ---------------------------
+        Controls
+        --------------------------- */
+
+        // Rotate a placed sign by 90 degrees
+        function rotateSign(uniqueId) {
+            const s = placedSigns.find(x => x.uniqueId === uniqueId);
+            if (!s) return;
+            // Increment rotation by 90 degrees, wrapping back to 0 after 360
+            s.rotation = (s.rotation + 90) % 360;
+            // Update the visual rotation
+            const el = document.getElementById(`sign-${uniqueId}`);
+            if (el) el.style.transform = `translate(-50%,-50%) rotate(${s.rotation}deg)`;
+        }
+
+        // Remove a placed sign from the canvas
+        function removeSign(uniqueId) {
+            // Remove from our data array
+            placedSigns = placedSigns.filter(x => x.uniqueId !== uniqueId);
+            // Remove from the visual display
+            const el = document.getElementById(`sign-${uniqueId}`);
+            if (el) el.remove();
+            updateCount();
+        }
+
+        // Clear all signs from the canvas
+        function clearAll() {
+            // Ask for confirmation before clearing everything
+            if (!confirm('Remove all placed signs?')) return;
+            // Remove all sign elements from the display
+            placedSigns.forEach(s => {
+                const el = document.getElementById(`sign-${s.uniqueId}`);
+                if (el) el.remove();
+            });
+            // Clear the data array
+            placedSigns = [];
+            updateCount();
+        }
+
+        // Update the displayed count of placed signs
+        function updateCount() {
+            document.getElementById('signCount').textContent = placedSigns.length;
+        }
+
+        // Save/export the current traffic plan
+        function savePlan() {
+            // Validate that user has placed some signs
+            if (placedSigns.length === 0) {
+                alert('⚠️ Please add some signs to the plan first!');
+                return;
+            }
+            // Validate that user has selected a traffic plan layout
+            const planSelect = document.getElementById('planSelect');
+            if (!planSelect.value) {
+                alert('⚠️ Please select a traffic plan first!');
+                return;
+            }
+            // Success - plan is ready (in a real app, this would export)
+            alert('💾 Plan ready to export with ' + placedSigns.length + ' signs positioned.');
+        }
+
+        /* ---------------------------
+        Update Canvas Background
+        Changes the displayed traffic plan layout
+        --------------------------- */
+        function updatePlan() {
+            const select = document.getElementById('planSelect');
+            const canvas = document.getElementById('canvas');
+            
+            // Check if user selected a layout
+            if (select.value) {
+                const selectedOption = select.options[select.selectedIndex];
+                const imageUrl = selectedOption.dataset.imageUrl;
+                
+                // Apply the layout image as the canvas background
+                if (imageUrl) {
+                    canvas.style.backgroundImage = `url(${imageUrl})`;
+                    console.log('Loaded plan:', selectedOption.textContent);
+                } else {
+                    canvas.style.backgroundImage = '';
+                }
+            } else {
+                // No image URL found, clear background
+                canvas.style.backgroundImage = '';
+            }
+        }
+
+        /* ---------------------------
+        Utility Functions
+        Helper functions for safety and formatting
+        --------------------------- */
+
+        // Escape HTML special characters to prevent XSS attacks
+        function escapeHtml(s) {
+            if (!s) return '';
+            return s.toString().replace(/[&<>"']/g, function (m) {
+                return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m];
+            });
+        }
+
+        /* ---------------------------
+        Initialize Application
+        Set everything up when the page loads
+        --------------------------- */
+        function init() {
+            // Set up all the interactive canvas features
+            setupCanvas();
+            // Load traffic signs and layouts from Google Sheets
+            loadFromGoogleSheets();
+            console.log('Designer ready');
+        }
+        // Start the application when page loads
+        init();
+    </script>
+    </body>
+</html>
