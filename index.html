@@ -581,9 +581,11 @@
         function getURLParams() {
             const params = new URLSearchParams(window.location.search);
             return {
-                planPhoto: params.get('planPhoto') || params.get('plan_photo') || params.get('image'),
-                layoutId: params.get('layoutId') || params.get('layout_id') || params.get('id'),
-                layoutTitle: params.get('layoutTitle') || params.get('title')
+                planPhoto: params.get('planPhoto') || params.get('plan_photo') || params.get('image') || params.get('Plan_Photo') || params.get('PlanPhoto'),
+                layoutId: params.get('layoutId') || params.get('layout_id') || params.get('id') || params.get('Typical_Layout_ID') || params.get('TypicalLayoutID'),
+                layoutTitle: params.get('layoutTitle') || params.get('title') || params.get('Typical_Layout_Title') || params.get('TypicalLayoutTitle'),
+                roadType: params.get('roadType') || params.get('Road_Type') || params.get('RoadType'),
+                roadComponent: params.get('roadComponent') || params.get('Road_Component') || params.get('RoadComponent')
             };
         }
 
@@ -751,8 +753,9 @@
         --------------------------- */
         function loadPlanFromURL() {
             const params = getURLParams();
+            console.log('URL Parameters received:', params);
             
-            // If planPhoto URL is provided directly, use it
+            // If planPhoto URL is provided directly from AppSheet, use it
             if (params.planPhoto) {
                 currentPlanImageUrl = params.planPhoto;
                 const canvas = document.getElementById('canvas');
@@ -761,16 +764,51 @@
                 const emptyCanvas = canvas.querySelector('.empty-canvas');
                 if (emptyCanvas) emptyCanvas.remove();
                 
-                console.log('Loaded plan from URL:', params.planPhoto);
+                console.log('Loaded plan from AppSheet:', params.planPhoto);
+                
+                // Update header with plan information
+                const header = document.querySelector('.header');
+                let planInfo = '';
+                
+                if (params.layoutId) {
+                    planInfo = `<strong>Editing Plan:</strong> ${params.layoutId}`;
+                }
+                if (params.layoutTitle) {
+                    planInfo += planInfo ? ` - ${params.layoutTitle}` : `<strong>Editing:</strong> ${params.layoutTitle}`;
+                }
+                if (params.roadType) {
+                    planInfo += ` (${params.roadType}`;
+                    if (params.roadComponent) {
+                        planInfo += ` - ${params.roadComponent}`;
+                    }
+                    planInfo += ')';
+                }
+                
+                if (planInfo) {
+                    const existingInfo = header.querySelector('.plan-info');
+                    if (existingInfo) {
+                        existingInfo.innerHTML = planInfo;
+                    } else {
+                        const infoDiv = document.createElement('p');
+                        infoDiv.className = 'plan-info';
+                        infoDiv.style.cssText = 'margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-hover); border-radius: 6px; border-left: 3px solid var(--accent);';
+                        infoDiv.innerHTML = planInfo;
+                        header.appendChild(infoDiv);
+                    }
+                }
+                
                 showNotification('Traffic plan loaded from AppSheet', 'success');
                 
-                // If we also have a layout title, show it in the header
-                if (params.layoutTitle) {
-                    const header = document.querySelector('.header p');
-                    header.textContent = `Editing: ${params.layoutTitle}`;
+                // Try to match and select in dropdown if available
+                if (params.layoutId && allLayouts.length > 0) {
+                    const select = document.getElementById('planSelect');
+                    const matchingOption = Array.from(select.options).find(opt => opt.value === params.layoutId);
+                    if (matchingOption) {
+                        select.value = params.layoutId;
+                    }
                 }
             }
-            // Otherwise, try to match by layout ID
+            // If only layoutId provided, try to match from loaded layouts
             else if (params.layoutId && allLayouts.length > 0) {
                 const layout = allLayouts.find(l => l.id === params.layoutId);
                 if (layout) {
@@ -778,7 +816,13 @@
                     select.value = layout.id;
                     updatePlan();
                     showNotification(`Loaded layout: ${layout.title}`, 'success');
+                } else {
+                    showNotification(`Layout ${params.layoutId} not found in library`, 'error');
                 }
+            }
+            // If no parameters, show instruction
+            else if (!params.planPhoto && !params.layoutId) {
+                console.log('No URL parameters - waiting for user to select a plan');
             }
         }
 
