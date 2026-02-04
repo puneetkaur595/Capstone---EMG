@@ -8,7 +8,513 @@
         <!-- Parsers -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-        <link href="style.css" rel="stylesheet" />
+        
+        <style>
+            /* Modern, Industrial Design System */
+            :root {
+                --primary: #ff6b35;
+                --primary-dark: #e04e1f;
+                --secondary: #004e89;
+                --accent: #f7b801;
+                --success: #06d6a0;
+                --danger: #ef476f;
+                --bg-main: #0a0e27;
+                --bg-card: #151934;
+                --bg-hover: #1e2447;
+                --text-primary: #e8eaed;
+                --text-secondary: #9aa0a6;
+                --border: #2d3356;
+                --shadow: 0 4px 20px rgba(0,0,0,0.4);
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Segoe UI', system-ui, sans-serif;
+                background: linear-gradient(135deg, var(--bg-main) 0%, #1a1f3a 100%);
+                color: var(--text-primary);
+                min-height: 100vh;
+                overflow-x: hidden;
+            }
+
+            .container {
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            .header {
+                background: var(--bg-card);
+                padding: 1.5rem 2rem;
+                border-bottom: 2px solid var(--primary);
+                box-shadow: var(--shadow);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .header::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: linear-gradient(90deg, var(--primary), var(--accent), var(--primary));
+                animation: shimmer 3s infinite;
+            }
+
+            @keyframes shimmer {
+                0%, 100% { opacity: 0.5; }
+                50% { opacity: 1; }
+            }
+
+            .header h1 {
+                font-size: 1.75rem;
+                font-weight: 700;
+                margin-bottom: 0.5rem;
+                letter-spacing: -0.02em;
+                background: linear-gradient(135deg, var(--primary), var(--accent));
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+
+            .header p {
+                color: var(--text-secondary);
+                font-size: 0.95rem;
+            }
+
+            .main-grid {
+                display: grid;
+                grid-template-columns: 320px 1fr;
+                flex: 1;
+                overflow: hidden;
+                gap: 0;
+            }
+
+            .sign-library {
+                background: var(--bg-card);
+                border-right: 1px solid var(--border);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .sign-library h2 {
+                padding: 1.25rem 1.5rem;
+                font-size: 1.1rem;
+                font-weight: 600;
+                background: var(--bg-hover);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            #signTotal {
+                color: var(--accent);
+                font-weight: 700;
+            }
+
+            .search-box {
+                padding: 1rem 1.5rem;
+                background: var(--bg-main);
+                border-bottom: 1px solid var(--border);
+            }
+
+            #searchBox {
+                width: 100%;
+                padding: 0.75rem 1rem;
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                color: var(--text-primary);
+                font-size: 0.9rem;
+                transition: all 0.2s;
+            }
+
+            #searchBox:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+            }
+
+            #signList {
+                flex: 1;
+                overflow-y: auto;
+                padding: 1rem;
+            }
+
+            #signList::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            #signList::-webkit-scrollbar-track {
+                background: var(--bg-main);
+            }
+
+            #signList::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 4px;
+            }
+
+            #signList::-webkit-scrollbar-thumb:hover {
+                background: var(--primary);
+            }
+
+            .sign-item {
+                background: var(--bg-hover);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 0.75rem;
+                margin-bottom: 0.75rem;
+                cursor: grab;
+                transition: all 0.2s;
+                display: flex;
+                gap: 0.75rem;
+                align-items: center;
+            }
+
+            .sign-item:hover {
+                border-color: var(--primary);
+                transform: translateX(4px);
+                box-shadow: -4px 0 0 var(--primary);
+            }
+
+            .sign-item:active {
+                cursor: grabbing;
+                transform: scale(0.98);
+            }
+
+            .sign-item img {
+                width: 50px;
+                height: 50px;
+                object-fit: contain;
+                flex-shrink: 0;
+                background: white;
+                padding: 4px;
+                border-radius: 4px;
+            }
+
+            .sign-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .sign-id {
+                font-weight: 600;
+                font-size: 0.85rem;
+                color: var(--primary);
+                margin-bottom: 0.25rem;
+            }
+
+            .sign-name {
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .sign-category {
+                font-size: 0.7rem;
+                color: var(--accent);
+                margin-top: 0.25rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            .canvas-container {
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: var(--bg-main);
+            }
+
+            .controls {
+                padding: 1.25rem 1.5rem;
+                background: var(--bg-card);
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                gap: 1rem;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+
+            #planSelect {
+                flex: 1;
+                min-width: 250px;
+                padding: 0.75rem 1rem;
+                background: var(--bg-hover);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                color: var(--text-primary);
+                font-size: 0.9rem;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            #planSelect:hover {
+                border-color: var(--primary);
+            }
+
+            #planSelect:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+            }
+
+            button {
+                padding: 0.75rem 1.5rem;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 0.9rem;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .btn-save {
+                background: var(--success);
+                color: white;
+            }
+
+            .btn-save:hover {
+                background: #05c293;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(6, 214, 160, 0.3);
+            }
+
+            .btn-clear {
+                background: var(--danger);
+                color: white;
+            }
+
+            .btn-clear:hover {
+                background: #e63462;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(239, 71, 111, 0.3);
+            }
+
+            .sign-count {
+                padding: 0.75rem 1.25rem;
+                background: var(--bg-hover);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                font-weight: 600;
+                color: var(--text-secondary);
+            }
+
+            .sign-count span {
+                color: var(--accent);
+                font-size: 1.1rem;
+            }
+
+            #canvas {
+                flex: 1;
+                position: relative;
+                overflow: auto;
+                background-size: contain;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-color: #1a1f3a;
+            }
+
+            #canvas.drag-over {
+                outline: 3px dashed var(--primary);
+                outline-offset: -10px;
+                background-color: rgba(255, 107, 53, 0.05);
+            }
+
+            .empty-canvas {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+                color: var(--text-secondary);
+                pointer-events: none;
+            }
+
+            .placed-sign {
+                position: absolute;
+                cursor: move;
+                z-index: 10;
+                transition: transform 0.2s;
+            }
+
+            .placed-sign:hover {
+                z-index: 100;
+            }
+
+            .placed-sign:hover .sign-controls {
+                opacity: 1;
+            }
+
+            .sign-controls {
+                position: absolute;
+                top: -35px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 4px;
+                opacity: 0;
+                transition: opacity 0.2s;
+                background: var(--bg-card);
+                padding: 4px;
+                border-radius: 6px;
+                border: 1px solid var(--border);
+                box-shadow: var(--shadow);
+            }
+
+            .sign-btn {
+                width: 28px;
+                height: 28px;
+                padding: 0;
+                border-radius: 4px;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: var(--bg-hover);
+                color: var(--text-primary);
+                border: 1px solid var(--border);
+            }
+
+            .btn-rotate {
+                background: var(--secondary);
+                color: white;
+            }
+
+            .btn-rotate:hover {
+                background: #00365f;
+            }
+
+            .btn-remove {
+                background: var(--danger);
+                color: white;
+            }
+
+            .btn-remove:hover {
+                background: #e63462;
+            }
+
+            .placed-sign img {
+                width: 70px;
+                height: 70px;
+                object-fit: contain;
+                background: white;
+                padding: 6px;
+                border-radius: 6px;
+                border: 2px solid var(--primary);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
+
+            .sign-label {
+                position: absolute;
+                bottom: -24px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--bg-card);
+                padding: 3px 8px;
+                border-radius: 4px;
+                font-size: 0.7rem;
+                font-weight: 600;
+                white-space: nowrap;
+                border: 1px solid var(--border);
+                color: var(--primary);
+            }
+
+            .loading {
+                padding: 3rem;
+                text-align: center;
+                color: var(--text-secondary);
+            }
+
+            .loading-spinner {
+                width: 40px;
+                height: 40px;
+                border: 3px solid var(--border);
+                border-top-color: var(--primary);
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+                margin: 0 auto 1rem;
+            }
+
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+
+            .notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-left: 4px solid var(--primary);
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: var(--shadow);
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+                max-width: 400px;
+            }
+
+            @keyframes slideIn {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            .notification.success {
+                border-left-color: var(--success);
+            }
+
+            .notification.error {
+                border-left-color: var(--danger);
+            }
+
+            /* Responsive Design */
+            @media (max-width: 1024px) {
+                .main-grid {
+                    grid-template-columns: 280px 1fr;
+                }
+            }
+
+            @media (max-width: 768px) {
+                .main-grid {
+                    grid-template-columns: 1fr;
+                    grid-template-rows: 40vh 1fr;
+                }
+                
+                .sign-library {
+                    border-right: none;
+                    border-bottom: 1px solid var(--border);
+                }
+
+                .controls {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+
+                #planSelect {
+                    min-width: 0;
+                }
+            }
+        </style>
     </head>
     <body>
         <div class="container">
@@ -55,38 +561,59 @@
     <script>
         /* ---------------------------
         Google Sheets Configuration
-        These IDs connect to the EMG traffic sign database
         --------------------------- */
         const GOOGLE_SHEET_ID = '11tHHhooqQ7tE1sbXQA_hVZKk2WIOoTqGQqQnqwF2kxI';
         const SIGNS_SHEET = 'Signs';
         const LAYOUTS_SHEET = 'Typical Layout Library';
 
         /* ---------------------------
-        Application State Variables
-        Keep track of what's happening in the app
+        Application State
         --------------------------- */
-        let placedSigns = []; // All signs that user has placed on the canvas
-        let draggedSign = null; // The sign being dragged right now
-        let allSigns = []; // Complete list of available traffic signs
-        let allLayouts = [];  // All traffic plan layouts we can choose from
+        let placedSigns = [];
+        let draggedSign = null;
+        let allSigns = [];
+        let allLayouts = [];
+        let currentPlanImageUrl = null;
+
+        /* ---------------------------
+        URL Parameter Handling for AppSheet Integration
+        --------------------------- */
+        function getURLParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                planPhoto: params.get('planPhoto') || params.get('plan_photo') || params.get('image'),
+                layoutId: params.get('layoutId') || params.get('layout_id') || params.get('id'),
+                layoutTitle: params.get('layoutTitle') || params.get('title')
+            };
+        }
+
+        /* ---------------------------
+        Notification System
+        --------------------------- */
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
 
         /* ---------------------------
         Google Drive Image Helpers
-        These functions handle Google Drive image URLs
         --------------------------- */
-
-        // Convert a Google Drive file ID into a viewable image URL
         function getDriveImageUrl(fileId) {
             if (!fileId) return null;
             return `https://drive.google.com/uc?export=view&id=${fileId}`;
         }
 
-        // Extract the file ID from any Google Drive URL format
         function extractDriveFileId(url) {
             if (!url) return null;
             url = url.toString().trim();
 
-            // Try different URL patterns that Google Drive uses
             const patterns = [
                 /\/d\/([a-zA-Z0-9_-]+)/,
                 /id=([a-zA-Z0-9_-]+)/,
@@ -94,39 +621,30 @@
                 /uc\?export=view&id=([a-zA-Z0-9_-]+)/
             ];
 
-            // Check each pattern to find a match
             for (const p of patterns) {
                 const m = url.match(p);
                 if (m && m[1]) return m[1];
             }
 
-            // Last resort: look for any long string that might be a file ID
             const fallback = url.match(/([a-zA-Z0-9_-]{20,})/);
             return fallback ? fallback[1] : null;
         }
 
         /* ---------------------------
-        Data Parsing Helpers
-        Convert spreadsheet data into usable objects
+        Data Parsing
         --------------------------- */
-
-        // Clean up column names to make them easier to match
-        // Removes spaces, underscores, and makes everything lowercase
         function normalizeKey(k) {
             return k ? k.toString().trim().replace(/\s+/g,'').replace(/_/g,'').toLowerCase() : '';
         }
 
-        // Parse sign data from spreadsheet rows into sign objects
         function parseSignRows(rows) {
             const signs = [];
             rows.forEach(row => {
-                // Create a map with normalized column names for easier access
                 const map = {};
                 Object.keys(row).forEach(k => {
                     map[normalizeKey(k)] = row[k];
                 });
 
-                // Extract sign information from various possible column names
                 const id = map.signid || map.id || map.code;
                 const name = map.signname || map.name || map.description;
                 const category = map.category || map.type || '';
@@ -134,18 +652,14 @@
                 const fileIdCol = map.drivefileid || map.fileid || map.imagefile;
                 const driveLinkCol = map.drivewebviewlink || map.drivewebview || map.webviewlink || map.link;
 
-                // Skip this row if we don't have the essential info
                 if (!id || !name) return;
 
-                // Try to get the Google Drive file ID from either column
                 let finalId = null;
                 if (fileIdCol && fileIdCol.toString().trim() !== '') finalId = fileIdCol.toString().trim();
                 else if (driveLinkCol && driveLinkCol.toString().trim() !== '') finalId = extractDriveFileId(driveLinkCol);
 
-                // Skip if we couldn't find a valid file ID
                 if (!finalId) return;
 
-                // Add this sign to our collection
                 signs.push({
                     id: id.toString().trim(),
                     name: name.toString().trim(),
@@ -158,26 +672,21 @@
             return signs;
         }
 
-        // Parse layout plan data from spreadsheet rows
         function parseLayoutRows(rows) {
             const layouts = [];
             rows.forEach(row => {
-                // Create normalized column map
                 const map = {};
                 Object.keys(row).forEach(k => {
                     map[normalizeKey(k)] = row[k];
                 });
 
-                // Extract layout information
                 const id = map.typicallayoutid || map.id || map.layoutid;
                 const title = map.typicallayouttitle || map.title || map.name;
                 const roadType = map.roadtype || map.type;
                 const planPhoto = map.planphoto || map.photo || map.image;
 
-                // Skip if missing essential information
                 if (!id || !title || !planPhoto) return;
 
-                // Add this layout to our collection
                 layouts.push({
                     id: id.toString().trim(),
                     title: title.toString().trim(),
@@ -190,36 +699,32 @@
 
         /* ---------------------------
         Load Data from Google Sheets
-        Fetches both signs and layout plans from the spreadsheet
         --------------------------- */
         async function loadFromGoogleSheets() {
             try {
                 console.log('Loading data from Google Sheets...');
                 
-                // Load the Signs sheet
                 const signsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SIGNS_SHEET)}`;
                 const signsResponse = await fetch(signsUrl);
                 if (signsResponse.ok) {
                     const signsText = await signsResponse.text();
-                    // Parse the CSV data using PapaParse library
                     Papa.parse(signsText, {
-                        header: true, // First row contains column headers
-                        skipEmptyLines: true, // Ignore blank rows
+                        header: true,
+                        skipEmptyLines: true,
                         complete: function(results) {
                             allSigns = parseSignRows(results.data);
                             document.getElementById('signTotal').textContent = allSigns.length;
                             loadSignLibrary(allSigns);
                             console.log(`✅ Loaded ${allSigns.length} signs`);
+                            showNotification(`Loaded ${allSigns.length} traffic signs`, 'success');
                         }
                     });
                 }
 
-                // Load the Layout Plans sheet
                 const layoutsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(LAYOUTS_SHEET)}`;
                 const layoutsResponse = await fetch(layoutsUrl);
                 if (layoutsResponse.ok) {
                     const layoutsText = await layoutsResponse.text();
-                    // Parse the layout plans CSV data
                     Papa.parse(layoutsText, {
                         header: true,
                         skipEmptyLines: true,
@@ -227,6 +732,9 @@
                             allLayouts = parseLayoutRows(results.data);
                             populateLayoutDropdown(allLayouts);
                             console.log(`✅ Loaded ${allLayouts.length} layouts`);
+                            
+                            // Check for URL parameters from AppSheet
+                            loadPlanFromURL();
                         }
                     });
                 }
@@ -234,24 +742,58 @@
             } catch (error) {
                 console.error('Error loading from Google Sheets:', error);
                 document.getElementById('signList').innerHTML = `<div class="loading" style="color:#dc2626">⚠️ Error loading data</div>`;
+                showNotification('Error loading data from Google Sheets', 'error');
             }
         }
 
         /* ---------------------------
-        Populate Layout Dropdown Menu
-        Organizes traffic plan layouts by road type
+        Load Plan from URL Parameters (AppSheet Integration)
+        --------------------------- */
+        function loadPlanFromURL() {
+            const params = getURLParams();
+            
+            // If planPhoto URL is provided directly, use it
+            if (params.planPhoto) {
+                currentPlanImageUrl = params.planPhoto;
+                const canvas = document.getElementById('canvas');
+                canvas.style.backgroundImage = `url(${params.planPhoto})`;
+                
+                const emptyCanvas = canvas.querySelector('.empty-canvas');
+                if (emptyCanvas) emptyCanvas.remove();
+                
+                console.log('Loaded plan from URL:', params.planPhoto);
+                showNotification('Traffic plan loaded from AppSheet', 'success');
+                
+                // If we also have a layout title, show it in the header
+                if (params.layoutTitle) {
+                    const header = document.querySelector('.header p');
+                    header.textContent = `Editing: ${params.layoutTitle}`;
+                }
+            }
+            // Otherwise, try to match by layout ID
+            else if (params.layoutId && allLayouts.length > 0) {
+                const layout = allLayouts.find(l => l.id === params.layoutId);
+                if (layout) {
+                    const select = document.getElementById('planSelect');
+                    select.value = layout.id;
+                    updatePlan();
+                    showNotification(`Loaded layout: ${layout.title}`, 'success');
+                }
+            }
+        }
+
+        /* ---------------------------
+        Populate Layout Dropdown
         --------------------------- */
         function populateLayoutDropdown(layouts) {
             const select = document.getElementById('planSelect');
             select.innerHTML = '<option value="">Select Traffic Plan Layout...</option>';
             
-            // Handle case where no layouts are available
             if (!layouts || layouts.length === 0) {
                 select.innerHTML += '<option disabled>No layouts available</option>';
                 return;
             }
 
-            // Group layouts by their road type for better organization
             const grouped = {};
             layouts.forEach(layout => {
                 const type = layout.roadType || 'Other';
@@ -259,11 +801,9 @@
                 grouped[type].push(layout);
             });
 
-            // Create dropdown groups for each road type
             Object.keys(grouped).sort().forEach(type => {
                 const optgroup = document.createElement('optgroup');
                 optgroup.label = type;
-                // Add each layout as an option under this road type
                 grouped[type].forEach(layout => {
                     const option = document.createElement('option');
                     option.value = layout.id;
@@ -277,45 +817,37 @@
 
         /* ---------------------------
         Display Sign Library
-        Shows all available traffic signs in the sidebar
         --------------------------- */
         function loadSignLibrary(signs) {
             const signList = document.getElementById('signList');
             signList.innerHTML = '';
 
-            // Handle empty library
             if (!signs || signs.length === 0) {
                 signList.innerHTML = '<div class="loading">No signs found</div>';
                 document.getElementById('signTotal').textContent = 0;
                 return;
             }
 
-            // Update the sign count display
             document.getElementById('signTotal').textContent = signs.length;
 
-            // Create a visual card for each traffic sign
             signs.forEach(sign => {
                 const signDiv = document.createElement('div');
                 signDiv.className = 'sign-item';
-                signDiv.draggable = true; // Make it draggable to the canvas
+                signDiv.draggable = true;
 
-                // Create the sign image
                 const img = document.createElement('img');
                 img.alt = sign.id;
                 img.src = sign.url || '';
-                img.loading = 'lazy'; // Load images as user scrolls
+                img.loading = 'lazy';
 
-                // Handle image loading errors with fallback options
                 img.onerror = function() {
                     if (sign.fileId) {
-                        // Try alternate Google Drive thumbnail URL
                         this.src = `https://drive.google.com/thumbnail?id=${sign.fileId}&sz=w200`;
                     } else {
-                        // Create a placeholder SVG if all else fails
                         this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="50" height="50"%3E%3Crect fill="%23f8fafc" width="50" height="50" stroke="%23cbd5e1"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23475569" dy=".3em" font-size="7"%3E' + encodeURIComponent(sign.id) + '%3C/text%3E%3C/svg%3E';
                     }
                 };
-                // Create the sign information section
+
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'sign-info';
                 infoDiv.innerHTML = `<div class="sign-id">${escapeHtml(sign.id)}</div>
@@ -325,14 +857,11 @@
                 signDiv.appendChild(img);
                 signDiv.appendChild(infoDiv);
 
-                // Set up drag behavior when user starts dragging the sign
                 signDiv.addEventListener('dragstart', (e) => {
-                    draggedSign = sign; // Remember which sign is being dragged
+                    draggedSign = sign;
                     try {
-                        // Store sign data for the drop event
                         e.dataTransfer.setData('text/plain', JSON.stringify(sign));
                     } catch (err) { }
-                    // Some browsers might restrict dataTransfer
                     e.dataTransfer.effectAllowed = 'copy';
                 });
 
@@ -341,30 +870,24 @@
         }
 
         /* ---------------------------
-        Canvas Setup & Drag/Drop Handling
-        Makes the canvas interactive for placing signs
+        Canvas Setup & Drag/Drop
         --------------------------- */
-        
         function setupCanvas() {
             const canvas = document.getElementById('canvas');
 
-            // When user drags a sign over the canvas
             canvas.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 canvas.classList.add('drag-over');
             });
 
-            // When user drags away from canvas
             canvas.addEventListener('dragleave', (e) => {
                 canvas.classList.remove('drag-over');
             });
 
-            // When user drops a sign onto the canvas
             canvas.addEventListener('drop', (e) => {
                 e.preventDefault();
                 canvas.classList.remove('drag-over');
 
-                // Try to get the sign data from the drop event
                 let sign = null;
                 try {
                     const raw = e.dataTransfer.getData('text/plain');
@@ -372,15 +895,11 @@
                         const parsed = JSON.parse(raw);
                         if (parsed && parsed.id) sign = parsed;
                     }
-                } catch (err) {
-                    // If parsing fails, we'll use the backup method below
-                }
+                } catch (err) { }
 
-                // Fallback to the currently dragged sign if data transfer failed
                 if (!sign) sign = draggedSign;
                 if (!sign) return;
 
-                // Calculate where the sign was dropped on the canvas
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
@@ -389,13 +908,10 @@
                 draggedSign = null;
             });
 
-            // When user selects a different traffic plan layout
             document.getElementById('planSelect').addEventListener('change', updatePlan);
 
-            // Set up the search box to filter signs
             document.getElementById('searchBox').addEventListener('input', (e) => {
                 const q = e.target.value.trim().toLowerCase();
-                // Filter signs based on search query
                 const filtered = allSigns.filter(s =>
                     s.id.toLowerCase().includes(q) ||
                     s.name.toLowerCase().includes(q) ||
@@ -407,29 +923,25 @@
 
         /* ---------------------------
         Place Sign on Canvas
-        Adds a new sign to the traffic plan
         --------------------------- */
         function addSign(sign, x, y) {
-            // Create a unique ID for this specific sign instance
             const signId = Date.now() + Math.floor(Math.random()*1000);
-            // Create a sign object with position and rotation data
             const signData = { ...sign, x, y, rotation: 0, uniqueId: signId };
-            // Add to our list of placed signs
             placedSigns.push(signData);
-            // Draw the sign on the canvas
             renderSign(signData);
-            // Update the sign counter
             updateCount();
+            
+            // Remove empty canvas message if present
+            const emptyCanvas = document.getElementById('canvas').querySelector('.empty-canvas');
+            if (emptyCanvas) emptyCanvas.remove();
         }
 
         /* ---------------------------
-        Draw Sign on Canvas
-        Creates the visual representation of a placed sign
+        Render Sign on Canvas
         --------------------------- */
         function renderSign(signData) {
             const canvas = document.getElementById('canvas');
 
-            // Create the main sign container
             const signDiv = document.createElement('div');
             signDiv.className = 'placed-sign';
             signDiv.id = `sign-${signData.uniqueId}`;
@@ -437,7 +949,6 @@
             signDiv.style.top = `${signData.y}px`;
             signDiv.style.transform = `translate(-50%,-50%) rotate(${signData.rotation}deg)`;
 
-            // Create control buttons (rotate and remove)
             const controls = document.createElement('div');
             controls.className = 'sign-controls';
             controls.innerHTML = `<button class="sign-btn btn-rotate" title="Rotate">↻</button>
@@ -451,47 +962,38 @@
                 else this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="70" height="70"%3E%3Crect fill="%23fef2f2" width="70" height="70" stroke="%23dc2626"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" fill="%23dc2626" dy=".3em" font-size="20"%3E⚠️%3C/text%3E%3C/svg%3E';
             };
 
-            // Create the sign image
             const label = document.createElement('div');
             label.className = 'sign-label';
             label.textContent = signData.id;
 
-            // Wire up the control buttons
             controls.querySelector('.btn-rotate').addEventListener('click', () => rotateSign(signData.uniqueId));
             controls.querySelector('.btn-remove').addEventListener('click', () => removeSign(signData.uniqueId));
             
-            // Assemble the sign element
             signDiv.appendChild(controls);
             signDiv.appendChild(img);
             signDiv.appendChild(label);
 
-            // Set up dragging behavior to move the sign around the canvas
             let isDragging = false, startX=0, startY=0;
 
-
             signDiv.addEventListener('mousedown', (e) => {
-                // Don't start dragging if user clicked a button
                 if (e.target.closest('.sign-btn')) return;
                 isDragging = true;
                 const rect = canvas.getBoundingClientRect();
                 startX = e.clientX - rect.left - signData.x;
                 startY = e.clientY - rect.top - signData.y;
                 signDiv.style.cursor = 'grabbing';
-                e.preventDefault();  // Prevent text selection
+                e.preventDefault();
             });
 
-            // Prevent text selection
             document.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
                 const rect = canvas.getBoundingClientRect();
                 signData.x = e.clientX - rect.left - startX;
                 signData.y = e.clientY - rect.top - startY;
-                // Update position on screen    
                 signDiv.style.left = `${signData.x}px`;
                 signDiv.style.top = `${signData.y}px`;
             });
 
-            // Update position on screen
             document.addEventListener('mouseup', () => {
                 if (isDragging) {
                     isDragging = false;
@@ -499,103 +1001,109 @@
                 }
             });
 
-            // Add the sign to the canvas
             canvas.appendChild(signDiv);
         }
 
         /* ---------------------------
         Controls
         --------------------------- */
-
-        // Rotate a placed sign by 90 degrees
         function rotateSign(uniqueId) {
             const s = placedSigns.find(x => x.uniqueId === uniqueId);
             if (!s) return;
-            // Increment rotation by 90 degrees, wrapping back to 0 after 360
             s.rotation = (s.rotation + 90) % 360;
-            // Update the visual rotation
             const el = document.getElementById(`sign-${uniqueId}`);
             if (el) el.style.transform = `translate(-50%,-50%) rotate(${s.rotation}deg)`;
         }
 
-        // Remove a placed sign from the canvas
         function removeSign(uniqueId) {
-            // Remove from our data array
             placedSigns = placedSigns.filter(x => x.uniqueId !== uniqueId);
-            // Remove from the visual display
             const el = document.getElementById(`sign-${uniqueId}`);
             if (el) el.remove();
             updateCount();
         }
 
-        // Clear all signs from the canvas
         function clearAll() {
-            // Ask for confirmation before clearing everything
             if (!confirm('Remove all placed signs?')) return;
-            // Remove all sign elements from the display
             placedSigns.forEach(s => {
                 const el = document.getElementById(`sign-${s.uniqueId}`);
                 if (el) el.remove();
             });
-            // Clear the data array
             placedSigns = [];
             updateCount();
+            showNotification('All signs cleared', 'info');
         }
 
-        // Update the displayed count of placed signs
         function updateCount() {
             document.getElementById('signCount').textContent = placedSigns.length;
         }
 
-        // Save/export the current traffic plan
         function savePlan() {
-            // Validate that user has placed some signs
             if (placedSigns.length === 0) {
-                alert('⚠️ Please add some signs to the plan first!');
+                showNotification('Please add some signs to the plan first!', 'error');
                 return;
             }
-            // Validate that user has selected a traffic plan layout
+            
             const planSelect = document.getElementById('planSelect');
-            if (!planSelect.value) {
-                alert('⚠️ Please select a traffic plan first!');
+            if (!planSelect.value && !currentPlanImageUrl) {
+                showNotification('Please select a traffic plan first!', 'error');
                 return;
             }
-            // Success - plan is ready (in a real app, this would export)
-            alert('💾 Plan ready to export with ' + placedSigns.length + ' signs positioned.');
+            
+            // Prepare export data
+            const exportData = {
+                planId: planSelect.value || 'custom',
+                planImageUrl: currentPlanImageUrl || planSelect.options[planSelect.selectedIndex]?.dataset.imageUrl,
+                signCount: placedSigns.length,
+                signs: placedSigns.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    x: s.x,
+                    y: s.y,
+                    rotation: s.rotation
+                })),
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('Export Data:', exportData);
+            showNotification(`Plan ready to export with ${placedSigns.length} signs positioned`, 'success');
+            
+            // In production, this would send data back to AppSheet or download as JSON
+            // For now, we'll copy to clipboard
+            navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
+                .then(() => showNotification('Plan data copied to clipboard', 'success'))
+                .catch(() => console.log('Could not copy to clipboard'));
         }
 
         /* ---------------------------
         Update Canvas Background
-        Changes the displayed traffic plan layout
         --------------------------- */
         function updatePlan() {
             const select = document.getElementById('planSelect');
             const canvas = document.getElementById('canvas');
             
-            // Check if user selected a layout
             if (select.value) {
                 const selectedOption = select.options[select.selectedIndex];
                 const imageUrl = selectedOption.dataset.imageUrl;
                 
-                // Apply the layout image as the canvas background
                 if (imageUrl) {
                     canvas.style.backgroundImage = `url(${imageUrl})`;
+                    currentPlanImageUrl = imageUrl;
                     console.log('Loaded plan:', selectedOption.textContent);
+                    showNotification(`Loaded: ${selectedOption.textContent}`, 'success');
+                    
+                    const emptyCanvas = canvas.querySelector('.empty-canvas');
+                    if (emptyCanvas) emptyCanvas.remove();
                 } else {
                     canvas.style.backgroundImage = '';
                 }
             } else {
-                // No image URL found, clear background
                 canvas.style.backgroundImage = '';
             }
         }
 
         /* ---------------------------
         Utility Functions
-        Helper functions for safety and formatting
         --------------------------- */
-
-        // Escape HTML special characters to prevent XSS attacks
         function escapeHtml(s) {
             if (!s) return '';
             return s.toString().replace(/[&<>"']/g, function (m) {
@@ -605,16 +1113,14 @@
 
         /* ---------------------------
         Initialize Application
-        Set everything up when the page loads
         --------------------------- */
         function init() {
-            // Set up all the interactive canvas features
             setupCanvas();
-            // Load traffic signs and layouts from Google Sheets
             loadFromGoogleSheets();
-            console.log('Designer ready');
+            console.log('EMG Traffic Plan Designer ready');
+            console.log('URL Parameters:', getURLParams());
         }
-        // Start the application when page loads
+        
         init();
     </script>
     </body>
