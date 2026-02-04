@@ -6,6 +6,7 @@
     <title>EMG Traffic Plan Designer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --primary: #ff6b35;
@@ -313,17 +314,425 @@
         @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .notification.success { border-left-color: var(--success); }
         .notification.error { border-left-color: var(--danger); }
-        @media (max-width: 1024px) { .main-grid { grid-template-columns: 280px 1fr; } }
+
+        /* ===========================
+           ANNOTATION PAGE STYLES
+        =========================== */
+        .annotation-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        .annotation-toolbar {
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .annotation-toolbar h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .tool-section {
+            background: var(--bg-hover);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .tool-section label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .tool-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .tool-btn {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .tool-btn svg { background: transparent; }
+
+        .tool-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .tool-btn.active {
+            border-color: var(--primary);
+            background: rgba(255, 107, 53, 0.1);
+            color: var(--primary);
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .color-btn {
+            width: 32px;
+            height: 32px;
+            border: 3px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .color-btn.active {
+            border-color: var(--text-primary);
+            transform: scale(1.15);
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            background: var(--primary-dark);
+            transform: scale(1.2);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .slider::-moz-range-thumb:hover {
+            background: var(--primary-dark);
+            transform: scale(1.2);
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: auto;
+        }
+
+        .btn-action {
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-undo {
+            background: var(--accent);
+            color: var(--bg-main);
+        }
+
+        .btn-undo:hover {
+            background: #e0a801;
+            transform: translateY(-1px);
+        }
+
+        .btn-clear-annotations {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-clear-annotations:hover {
+            background: #e63462;
+            transform: translateY(-1px);
+        }
+
+        .btn-back {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-back:hover {
+            background: #00365f;
+            transform: translateY(-1px);
+        }
+
+        .btn-download {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: #05c293;
+            transform: translateY(-1px);
+        }
+
+        .annotation-canvas-container {
+            position: relative;
+            background: #1a1f3a;
+            overflow: hidden;
+        }
+
+        #annotationCanvas {
+            display: block;
+            cursor: crosshair;
+            background: transparent;
+        }
+
+        #textBoxContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .text-box {
+            position: absolute;
+            padding: 0.5rem 0.75rem;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px dashed var(--primary);
+            border-radius: 6px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-weight: 600;
+            cursor: move;
+            pointer-events: auto;
+            min-width: 100px;
+            min-height: 30px;
+            color: #000;
+        }
+
+        .text-box:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: white;
+        }
+
+        .text-box-remove {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--danger);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .text-box:hover .text-box-remove {
+            opacity: 1;
+        }
+
+        .text-box-remove:hover {
+            background: #e63462;
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 1024px) { 
+            .main-grid, .annotation-layout { 
+                grid-template-columns: 280px 1fr; 
+            } 
+        }
         @media (max-width: 768px) {
-            .main-grid { grid-template-columns: 1fr; grid-template-rows: 40vh 1fr; }
-            .sign-library { border-right: none; border-bottom: 1px solid var(--border); }
-            .controls { flex-direction: column; align-items: stretch; }
-            .plan-title-bar { min-width: 0; }
+            .main-grid, .annotation-layout { 
+                grid-template-columns: 1fr; 
+                grid-template-rows: 40vh 1fr; 
+            }
+            .sign-library, .annotation-toolbar { 
+                border-right: none; 
+                border-bottom: 1px solid var(--border); 
+            }
+            .controls { 
+                flex-direction: column; 
+                align-items: stretch; 
+            }
+            .plan-title-bar { 
+                min-width: 0; 
+            }
+            .tool-buttons {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        /* Print Styles - Only show the canvas/annotation area */
+        @media print {
+            /* Force hide everything we don't want */
+            .header,
+            .sign-library,
+            .annotation-toolbar,
+            .controls,
+            .notification,
+            .tool-section,
+            .action-buttons,
+            h2,
+            h1,
+            p,
+            label,
+            button,
+            input,
+            select {
+                display: none !important;
+                visibility: hidden !important;
+            }
+            
+            /* Force the page layout */
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                overflow: hidden !important;
+            }
+            
+            /* Set page size and margins */
+            @page {
+                size: portrait;
+                margin: 0;
+            }
+            
+            /* Hide page 1 if it's showing */
+            #page1 {
+                display: none !important;
+            }
+            
+            /* Show and expand page 2 */
+            #page2 {
+                display: block !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            /* Force annotation layout to take full space */
+            .annotation-layout {
+                display: block !important;
+                grid-template-columns: none !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            /* Force canvas container to take full space */
+            .annotation-canvas-container {
+                position: fixed !important;
+                top: 0 !important;
+                left: 50% !important;
+                transform: translateX(-50%) scaleX(1.85) !important;
+                transform-origin: center top !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+            }
+            
+            /* Make canvases fill container */
+            #baseCanvas,
+            #annotationCanvas {
+                display: block !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                max-height: 100vh !important;
+            }
+            
+            /* Show text boxes */
+            #textBoxContainer {
+                display: block !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                pointer-events: none !important;
+            }
+            
+            .text-box {
+                display: block !important;
+                visibility: visible !important;
+                pointer-events: none !important;
+            }
+            
+            /* Hide text box remove buttons */
+            .text-box-remove {
+                display: none !important;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- PAGE 1: Sign Placement -->
+    <div id="page1" class="container">
         <div class="header">
             <h1>🚧 EMG Traffic Plan Designer</h1>
             <p>Drag signs from the library to customize your traffic control plan</p>
@@ -343,10 +752,10 @@
             </div>
             <div class="canvas-container">
                 <div class="controls">
-                    <div class="plan-title-bar">
-                        <span id="planTitleDisplay">Loading plan...</span>
-                    </div>
-                    <button class="btn-save" onclick="savePlan()">💾 Save Plan</button>
+                    <select id="planSelect" style="flex: 1; min-width: 250px; padding: 0.75rem 1rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 0.95rem; font-weight: 600; cursor: pointer;">
+                        <option value="">Select Traffic Plan Layout...</option>
+                    </select>
+                    <button class="btn-save" onclick="goToAnnotation()">Next: Annotate →</button>
                     <button class="btn-clear" onclick="clearAll()">🗑️ Clear All</button>
                     <div class="sign-count"><span id="signCount">0</span> signs placed</div>
                 </div>
@@ -359,15 +768,122 @@
             </div>
         </div>
     </div>
+
+    <!-- PAGE 2: Annotation & Drawing -->
+    <div id="page2" class="container" style="display:none;">
+        <div class="header">
+            <h1>✏️ Annotate Your Traffic Plan</h1>
+            <p>Add notes, highlights, and text boxes to finalize your plan</p>
+        </div>
+        <div class="annotation-layout">
+            <div class="annotation-toolbar">
+                <h2>🎨 Drawing Tools</h2>
+                
+                <div class="tool-section">
+                    <label>Tool:</label>
+                    <div class="tool-buttons">
+                        <button class="tool-btn active" data-tool="pen" title="Pen">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                                <path d="M2 2l7.586 7.586"></path>
+                            </svg>
+                            Pen
+                        </button>
+                        <button class="tool-btn" data-tool="highlighter" title="Highlighter">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 11l-6 6v3h9l3-3"></path>
+                                <path d="M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"></path>
+                            </svg>
+                            Highlight
+                        </button>
+                        <button class="tool-btn" data-tool="textbox" title="Text Box">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                                <line x1="9" y1="20" x2="15" y2="20"></line>
+                                <line x1="12" y1="4" x2="12" y2="20"></line>
+                            </svg>
+                            Text
+                        </button>
+                        <button class="tool-btn" data-tool="eraser" title="Eraser">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 20H7L3 16l5-5 5 5 7-7"></path>
+                            </svg>
+                            Eraser
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <label>Color:</label>
+                    <div class="color-picker">
+                        <button class="color-btn active" data-color="#ef4444" style="background:#ef4444"></button>
+                        <button class="color-btn" data-color="#f97316" style="background:#f97316"></button>
+                        <button class="color-btn" data-color="#eab308" style="background:#eab308"></button>
+                        <button class="color-btn" data-color="#22c55e" style="background:#22c55e"></button>
+                        <button class="color-btn" data-color="#3b82f6" style="background:#3b82f6"></button>
+                        <button class="color-btn" data-color="#8b5cf6" style="background:#8b5cf6"></button>
+                        <button class="color-btn" data-color="#000000" style="background:#000000"></button>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <label>Pen Size: <span id="sizeValue">3</span>px</label>
+                    <input type="range" id="penSize" min="1" max="20" value="3" class="slider">
+                </div>
+
+                <div class="tool-section">
+                    <label>Highlighter Size: <span id="highlighterSizeValue">8</span>px</label>
+                    <input type="range" id="highlighterSize" min="3" max="30" value="8" class="slider">
+                </div>
+
+                <div class="tool-section">
+                    <label>Text Size: <span id="textSizeValue">16</span>px</label>
+                    <input type="range" id="textSize" min="10" max="48" value="16" class="slider">
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn-action btn-undo" onclick="undo()">↶ Undo</button>
+                    <button class="btn-action btn-clear-annotations" onclick="clearAnnotations()">🗑️ Clear</button>
+                    <button class="btn-action btn-back" onclick="goBackToDesign()">← Back</button>
+                    <button class="btn-action btn-download" onclick="downloadPlan()">💾 Download</button>
+                </div>
+            </div>
+
+            <div class="annotation-canvas-container">
+                <canvas id="baseCanvas" style="position: absolute; top: 0; left: 0;"></canvas>
+                <canvas id="annotationCanvas" style="position: absolute; top: 0; left: 0;"></canvas>
+                <div id="textBoxContainer"></div>
+            </div>
+        </div>
+    </div>
+
 <script>
 const GOOGLE_SHEET_ID = '11tHHhooqQ7tE1sbXQA_hVZKk2WIOoTqGQqQnqwF2kxI';
 const SIGNS_SHEET = 'Signs';
+const LAYOUTS_SHEET = 'Typical Layout Library';
 
 let placedSigns = [];
 let draggedSign = null;
 let allSigns = [];
+let allLayouts = [];
 let currentPlanImageUrl = null;
 let currentPlanInfo = {};
+
+/* ---------------------------
+   Annotation State Variables
+--------------------------- */
+let currentTool = 'pen';
+let currentColor = '#ef4444';
+let penSize = 3;
+let highlighterSize = 8;
+let textSize = 16;
+let isDrawing = false;
+let drawingHistory = [];
+let currentPath = [];
+let textBoxes = [];
+let canvas, ctx;
+let tempCanvas, tempCtx; // Temporary canvas for highlighter
 
 function getURLParams() {
     const params = new URLSearchParams(window.location.search);
@@ -443,6 +959,31 @@ function parseSignRows(rows) {
     return signs;
 }
 
+function parseLayoutRows(rows) {
+    const layouts = [];
+    rows.forEach(row => {
+        const map = {};
+        Object.keys(row).forEach(k => {
+            map[normalizeKey(k)] = row[k];
+        });
+
+        const id = map.typicallayoutid || map.id || map.layoutid;
+        const title = map.typicallayouttitle || map.title || map.name;
+        const roadType = map.roadtype || map.type;
+        const planPhoto = map.planphoto || map.photo || map.image;
+
+        if (!id || !title || !planPhoto) return;
+
+        layouts.push({
+            id: id.toString().trim(),
+            title: title.toString().trim(),
+            roadType: roadType ? roadType.toString().trim() : '',
+            imageUrl: planPhoto.toString().trim()
+        });
+    });
+    return layouts;
+}
+
 async function loadFromGoogleSheets() {
     try {
         console.log('Loading signs from Google Sheets...');
@@ -461,6 +1002,25 @@ async function loadFromGoogleSheets() {
                 }
             });
         }
+
+        // Load the Layout Plans sheet
+        console.log('Loading layouts from Google Sheets...');
+        const layoutsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(LAYOUTS_SHEET)}`;
+        const layoutsResponse = await fetch(layoutsUrl);
+        if (layoutsResponse.ok) {
+            const layoutsText = await layoutsResponse.text();
+            Papa.parse(layoutsText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    allLayouts = parseLayoutRows(results.data);
+                    populateLayoutDropdown(allLayouts);
+                    console.log(`✅ Loaded ${allLayouts.length} layouts`);
+                }
+            });
+        }
+
+        // Check if URL has parameters (opened from AppSheet)
         loadPlanFromURL();
     } catch (error) {
         console.error('Error loading from Google Sheets:', error);
@@ -482,29 +1042,78 @@ function loadPlanFromURL() {
         const emptyCanvas = canvas.querySelector('.empty-canvas');
         if (emptyCanvas) emptyCanvas.remove();
         
-        let displayTitle = params.layoutTitle || `Plan ${params.layoutId || 'Custom'}`;
-        document.getElementById('planTitleDisplay').textContent = displayTitle;
-        
-        const header = document.querySelector('.header');
-        let planInfo = '';
-        if (params.layoutId) planInfo = `<strong>Plan ID:</strong> ${params.layoutId}`;
-        if (params.roadType) planInfo += (planInfo ? ' | ' : '') + `<strong>Road Type:</strong> ${params.roadType}`;
-        if (params.roadComponent) planInfo += (planInfo ? ' | ' : '') + `<strong>Component:</strong> ${params.roadComponent}`;
-        
-        if (planInfo) {
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'plan-info';
-            infoDiv.innerHTML = planInfo;
-            header.appendChild(infoDiv);
-        }
-        
-        console.log('✅ Plan loaded successfully');
+        console.log('✅ Plan loaded from URL successfully');
         showNotification('Traffic plan loaded successfully', 'success');
     } else {
-        console.error('❌ No plan photo in URL');
-        document.getElementById('planTitleDisplay').textContent = 'No plan loaded';
-        document.getElementById('planTitleDisplay').style.color = 'var(--danger)';
-        showNotification('No plan provided. Open from AppSheet.', 'error');
+        console.log('No URL parameters - user can select from dropdown');
+    }
+}
+
+function populateLayoutDropdown(layouts) {
+    const select = document.getElementById('planSelect');
+    select.innerHTML = '<option value="">Select Traffic Plan Layout...</option>';
+    
+    if (!layouts || layouts.length === 0) {
+        select.innerHTML += '<option disabled>No layouts available</option>';
+        return;
+    }
+
+    // Group layouts by their road type for better organization
+    const grouped = {};
+    layouts.forEach(layout => {
+        const type = layout.roadType || 'Other';
+        if (!grouped[type]) grouped[type] = [];
+        grouped[type].push(layout);
+    });
+
+    // Create dropdown groups for each road type
+    Object.keys(grouped).sort().forEach(type => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = type;
+        grouped[type].forEach(layout => {
+            const option = document.createElement('option');
+            option.value = layout.id;
+            option.textContent = layout.title;
+            option.dataset.imageUrl = layout.imageUrl;
+            option.dataset.title = layout.title;
+            option.dataset.roadType = layout.roadType;
+            optgroup.appendChild(option);
+        });
+        select.appendChild(optgroup);
+    });
+}
+
+function updatePlan() {
+    const select = document.getElementById('planSelect');
+    const canvas = document.getElementById('canvas');
+    
+    if (select.value) {
+        const selectedOption = select.options[select.selectedIndex];
+        const imageUrl = selectedOption.dataset.imageUrl;
+        
+        if (imageUrl) {
+            currentPlanImageUrl = imageUrl;
+            currentPlanInfo = {
+                layoutId: select.value,
+                layoutTitle: selectedOption.dataset.title,
+                roadType: selectedOption.dataset.roadType,
+                planPhoto: imageUrl
+            };
+            
+            canvas.style.backgroundImage = `url(${imageUrl})`;
+            
+            const emptyCanvas = canvas.querySelector('.empty-canvas');
+            if (emptyCanvas) emptyCanvas.remove();
+            
+            console.log('✅ Plan loaded:', selectedOption.textContent);
+            showNotification('Plan loaded: ' + selectedOption.textContent, 'success');
+        } else {
+            canvas.style.backgroundImage = '';
+        }
+    } else {
+        canvas.style.backgroundImage = '';
+        currentPlanImageUrl = null;
+        currentPlanInfo = {};
     }
 }
 
@@ -585,6 +1194,9 @@ function setupCanvas() {
         addSign(sign, x, y);
         draggedSign = null;
     });
+
+    // Plan selector change event
+    document.getElementById('planSelect').addEventListener('change', updatePlan);
     
     document.getElementById('searchBox').addEventListener('input', (e) => {
         const q = e.target.value.trim().toLowerCase();
@@ -701,30 +1313,390 @@ function updateCount() {
     document.getElementById('signCount').textContent = placedSigns.length;
 }
 
-function savePlan() {
+/* ---------------------------
+   PAGE NAVIGATION
+--------------------------- */
+function goToAnnotation() {
     if (placedSigns.length === 0) {
-        showNotification('Please add some signs first!', 'error');
+        showNotification('Please add some signs to the plan first!', 'error');
         return;
     }
+    if (!currentPlanImageUrl) {
+        showNotification('Please select a traffic plan first!', 'error');
+        return;
+    }
+
+    document.getElementById('page1').style.display = 'none';
+    document.getElementById('page2').style.display = 'flex';
     
-    const exportData = {
-        planInfo: currentPlanInfo,
-        planImageUrl: currentPlanImageUrl,
-        signCount: placedSigns.length,
-        signs: placedSigns.map(s => ({
-            id: s.id,
-            name: s.name,
-            x: s.x,
-            y: s.y,
-            rotation: s.rotation
-        })),
-        timestamp: new Date().toISOString()
+    initAnnotationCanvas();
+}
+
+function goBackToDesign() {
+    document.getElementById('page1').style.display = 'flex';
+    document.getElementById('page2').style.display = 'none';
+}
+
+/* ---------------------------
+   ANNOTATION CANVAS SETUP
+--------------------------- */
+function initAnnotationCanvas() {
+    // Base canvas (protected from eraser)
+    const baseCanvas = document.getElementById('baseCanvas');
+    const baseCtx = baseCanvas.getContext('2d');
+    
+    // Annotation canvas (for drawing)
+    canvas = document.getElementById('annotationCanvas');
+    ctx = canvas.getContext('2d');
+
+    const container = canvas.parentElement;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    
+    baseCanvas.width = width;
+    baseCanvas.height = height;
+    canvas.width = width;
+    canvas.height = height;
+
+    
+    tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    tempCtx = tempCanvas.getContext('2d');
+
+
+    captureDesignAsBackground(baseCanvas, baseCtx);
+    setupDrawingTools();
+}
+
+async function captureDesignAsBackground(baseCanvas, baseCtx) {
+    const designCanvas = document.getElementById('canvas');
+    const bgStyle = designCanvas.style.backgroundImage;
+    const bgUrl = bgStyle.match(/url\(["']?([^"']*)["']?\)/)?.[1];
+    
+    if (bgUrl) {
+        const img = new Image();
+        // Don't use crossOrigin to avoid CORS issues
+        img.onload = function() {
+            const scale = Math.min(baseCanvas.width / img.width, baseCanvas.height / img.height);
+            const x = (baseCanvas.width - img.width * scale) / 2;
+            const y = (baseCanvas.height - img.height * scale) / 2;
+            baseCtx.drawImage(img, x, y, img.width * scale, img.height * scale);
+            drawPlacedSignsOnCanvas(baseCanvas, baseCtx);
+        };
+        img.onerror = function() {
+            console.log('Failed to load background image');
+            drawPlacedSignsOnCanvas(baseCanvas, baseCtx);
+        };
+        img.src = bgUrl;
+    } else {
+        drawPlacedSignsOnCanvas(baseCanvas, baseCtx);
+    }
+}
+
+async function drawPlacedSignsOnCanvas(baseCanvas, baseCtx) {
+    console.log('Drawing', placedSigns.length, 'signs on annotation canvas');
+    
+    // Copy signs from the original canvas instead of re-loading images
+    const originalCanvas = document.getElementById('canvas');
+    
+    for (const sign of placedSigns) {
+        try {
+           
+            const signElement = document.getElementById(`sign-${sign.uniqueId}`);
+            
+            if (signElement) {
+                const signImg = signElement.querySelector('img');
+                
+                if (signImg && signImg.complete && signImg.naturalHeight !== 0) {
+                    // Image is loaded successfully, draw it
+                    baseCtx.save();
+                    baseCtx.translate(sign.x, sign.y);
+                    baseCtx.rotate((sign.rotation * Math.PI) / 180);
+                    
+                    try {
+                        baseCtx.drawImage(signImg, -35, -35, 70, 70);
+                        console.log('✅ Drew sign from DOM:', sign.id);
+                    } catch (err) {
+                        console.log('Could not draw from DOM element, trying URL:', sign.id);
+                        
+                        await drawSignFromUrl(baseCtx, sign);
+                    }
+                    
+                    
+                    baseCtx.font = '600 11px sans-serif';
+                    baseCtx.fillStyle = '#1e293b';
+                    baseCtx.textAlign = 'center';
+                    baseCtx.fillText(sign.id, 0, 50);
+                    
+                    baseCtx.restore();
+                } else {
+                    
+                    baseCtx.save();
+                    baseCtx.translate(sign.x, sign.y);
+                    baseCtx.rotate((sign.rotation * Math.PI) / 180);
+                    await drawSignFromUrl(baseCtx, sign);
+                    baseCtx.restore();
+                }
+            } else {
+                // Sign element not found, try loading from URL
+                baseCtx.save();
+                baseCtx.translate(sign.x, sign.y);
+                baseCtx.rotate((sign.rotation * Math.PI) / 180);
+                await drawSignFromUrl(baseCtx, sign);
+                baseCtx.restore();
+            }
+        } catch (err) {
+            console.error('Error processing sign:', sign.id, err);
+        }
+    }
+    
+    console.log('Finished drawing all signs');
+}
+
+
+async function drawSignFromUrl(ctx, sign) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        
+        img.onload = function() {
+            try {
+                ctx.drawImage(img, -35, -35, 70, 70);
+                
+                ctx.font = '600 11px sans-serif';
+                ctx.fillStyle = '#1e293b';
+                ctx.textAlign = 'center';
+                ctx.fillText(sign.id, 0, 50);
+                
+                console.log('✅ Loaded from URL:', sign.id);
+            } catch (err) {
+                console.error('Error drawing from URL:', sign.id, err);
+            }
+            resolve();
+        };
+        
+        img.onerror = function() {
+            console.log('❌ Failed to load:', sign.id);
+            
+            // Draw placeholder
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(-35, -35, 70, 70);
+            
+            ctx.strokeStyle = '#dc2626';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-35, -35, 70, 70);
+            
+            ctx.font = 'bold 10px sans-serif';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const id = sign.id;
+            if (id.length > 8) {
+                ctx.fillText(id.substring(0, 8), 0, -5);
+                ctx.fillText(id.substring(8), 0, 5);
+            } else {
+                ctx.fillText(id, 0, 0);
+            }
+            
+            resolve();
+        };
+        
+        img.src = sign.url;
+        
+        // Timeout after 3 seconds
+        setTimeout(() => {
+            if (!img.complete) {
+                img.src = '';
+                img.onerror();
+            }
+        }, 3000);
+    });
+}
+
+/* ---------------------------
+   DRAWING TOOLS SETUP
+--------------------------- */
+function setupDrawingTools() {
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTool = btn.dataset.tool;
+        });
+    });
+
+    document.querySelectorAll('.color-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentColor = btn.dataset.color;
+        });
+    });
+
+    const penSizeSlider = document.getElementById('penSize');
+    penSizeSlider.addEventListener('input', (e) => {
+        penSize = parseInt(e.target.value);
+        document.getElementById('sizeValue').textContent = penSize;
+    });
+
+    const highlighterSizeSlider = document.getElementById('highlighterSize');
+    highlighterSizeSlider.addEventListener('input', (e) => {
+        highlighterSize = parseInt(e.target.value);
+        document.getElementById('highlighterSizeValue').textContent = highlighterSize;
+    });
+
+    const textSizeSlider = document.getElementById('textSize');
+    textSizeSlider.addEventListener('input', (e) => {
+        textSize = parseInt(e.target.value);
+        document.getElementById('textSizeValue').textContent = textSize;
+    });
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    canvas.addEventListener('click', handleCanvasClick);
+}
+
+function startDrawing(e) {
+    if (currentTool === 'textbox') return;
+    
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    currentPath = [{ x, y }];
+
+    
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (currentTool === 'eraser') {
+        // Eraser only erases the annotation layer
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = penSize * 5;
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else if (currentTool === 'highlighter') {
+        // Highlighter - prevents darkening on overlaps
+        ctx.globalCompositeOperation = 'lighten';
+        ctx.lineWidth = highlighterSize * 4;
+        ctx.globalAlpha = 1.0;
+        ctx.lineCap = 'butt';
+        
+        
+        
+        const r = parseInt(currentColor.slice(1, 3), 16);
+        const g = parseInt(currentColor.slice(3, 5), 16);
+        const b = parseInt(currentColor.slice(5, 7), 16);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.20)`;
+    } else {
+        // Regular pen
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = penSize;
+        ctx.strokeStyle = currentColor;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+}
+
+function draw(e) {
+    if (!isDrawing || currentTool === 'textbox') return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    currentPath.push({ x, y });
+    
+    if (currentTool === 'highlighter') {
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    } else {
+        // For pen and eraser
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    }
+}
+
+function stopDrawing() {
+    if (!isDrawing) return;
+    
+    isDrawing = false;
+    
+    // Reset to defaults
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineCap = 'round';
+    
+    currentPath = [];
+}
+
+function handleCanvasClick(e) {
+    if (currentTool !== 'textbox') return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    createTextBox(x, y);
+}
+
+function createTextBox(x, y) {
+    const textBox = document.createElement('div');
+    textBox.className = 'text-box';
+    textBox.contentEditable = true;
+    textBox.style.left = x + 'px';
+    textBox.style.top = y + 'px';
+    textBox.style.color = currentColor;
+    textBox.style.fontSize = textSize + 'px';
+    textBox.textContent = 'Double click to edit';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'text-box-remove';
+    removeBtn.textContent = '×';
+    removeBtn.onclick = () => {
+        textBox.remove();
+        textBoxes = textBoxes.filter(t => t !== textBox);
     };
+
+    textBox.appendChild(removeBtn);
+    document.getElementById('textBoxContainer').appendChild(textBox);
+    textBoxes.push(textBox);
+
+    textBox.focus();
+    document.execCommand('selectAll', false, null);
+}
+
+/* ---------------------------
+   ANNOTATION ACTIONS
+--------------------------- */
+function undo() {
+    // Clear the annotation canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    showNotification('Undo - Clear last stroke', 'info');
+}
+
+function clearAnnotations() {
+    if (!confirm('Clear all annotations? This will keep your traffic plan but remove drawings and text.')) return;
     
-    console.log('Export Data:', exportData);
-    navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
-        .then(() => showNotification(`Plan saved! ${placedSigns.length} signs - Data copied to clipboard`, 'success'))
-        .catch(() => showNotification(`Plan ready with ${placedSigns.length} signs`, 'success'));
+    // Clear only the annotation canvas (not the base canvas with the plan)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    textBoxes.forEach(tb => tb.remove());
+    textBoxes = [];
+    showNotification('Annotations cleared', 'info');
+}
+
+function downloadPlan() {
+    console.log('Download button clicked!');
+    window.print();
 }
 
 function escapeHtml(s) {
