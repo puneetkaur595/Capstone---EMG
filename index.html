@@ -1359,9 +1359,11 @@ function initAnnotationCanvas() {
     canvas.height = height;
 
     drawingHistory = [];
-    const initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    drawingHistory.push(initialState);
-
+	const initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        drawingHistory.push({
+    		     canvasData: initialState,
+                            textBoxes: []
+});
     
     tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
@@ -1644,14 +1646,26 @@ function stopDrawing() {
     
     currentPath = [];
 }
-
 /* ---------------------------
    DRAWING HISTORY MANAGEMENT
 --------------------------- */
 function saveDrawingState() {
     // Save current canvas state
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    drawingHistory.push(imageData);
+    
+    // Also save text boxes state
+    const textBoxState = textBoxes.map(tb => ({
+        left: tb.style.left,
+        top: tb.style.top,
+        color: tb.style.color,
+        fontSize: tb.style.fontSize,
+        text: tb.textContent.replace('×', '').trim()
+    }));
+    
+    drawingHistory.push({
+        canvasData: imageData,
+        textBoxes: textBoxState
+    });
     
     // Keep only last 20 states to prevent memory issues
     if (drawingHistory.length > 20) {
@@ -1665,14 +1679,45 @@ function undo() {
         return;
     }
     
-    
+    // Remove current state
     drawingHistory.pop();
     
-  
+    // Restore previous state
     const previousState = drawingHistory[drawingHistory.length - 1];
-    ctx.putImageData(previousState, 0, 0);
     
-    showNotification('Undo - Last stroke removed', 'info');
+    // Restore canvas
+    ctx.putImageData(previousState.canvasData, 0, 0);
+    
+    // Restore text boxes
+    // Remove all current text boxes
+    textBoxes.forEach(tb => tb.remove());
+    textBoxes = [];
+    
+    // Recreate text boxes from saved state
+    previousState.textBoxes.forEach(tbData => {
+        const textBox = document.createElement('div');
+        textBox.className = 'text-box';
+        textBox.contentEditable = true;
+        textBox.style.left = tbData.left;
+        textBox.style.top = tbData.top;
+        textBox.style.color = tbData.color;
+        textBox.style.fontSize = tbData.fontSize;
+        textBox.textContent = tbData.text;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'text-box-remove';
+        removeBtn.textContent = '×';
+        removeBtn.onclick = () => {
+            textBox.remove();
+            textBoxes = textBoxes.filter(t => t !== textBox);
+        };
+
+        textBox.appendChild(removeBtn);
+        document.getElementById('textBoxContainer').appendChild(textBox);
+        textBoxes.push(textBox);
+    });
+    
+    showNotification('Undo - Last action removed', 'info');
 }
 function handleCanvasClick(e) {
     if (currentTool !== 'textbox') return;
@@ -1706,11 +1751,12 @@ function createTextBox(x, y) {
     document.getElementById('textBoxContainer').appendChild(textBox);
     textBoxes.push(textBox);
 
+
+    saveDrawingState();
+
     textBox.focus();
     document.execCommand('selectAll', false, null);
-}
-
-/* ---------------------------
+}/* ---------------------------
    ANNOTATION ACTIONS
 --------------------------- */
 
