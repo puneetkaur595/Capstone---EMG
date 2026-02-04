@@ -1358,6 +1358,10 @@ function initAnnotationCanvas() {
     canvas.width = width;
     canvas.height = height;
 
+    drawingHistory = [];
+    const initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    drawingHistory.push(initialState);
+
     
     tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
@@ -1635,9 +1639,41 @@ function stopDrawing() {
     ctx.globalCompositeOperation = 'source-over';
     ctx.lineCap = 'round';
     
+    // Save the canvas state to history after completing a stroke
+    saveDrawingState();
+    
     currentPath = [];
 }
 
+/* ---------------------------
+   DRAWING HISTORY MANAGEMENT
+--------------------------- */
+function saveDrawingState() {
+    // Save current canvas state
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    drawingHistory.push(imageData);
+    
+    // Keep only last 20 states to prevent memory issues
+    if (drawingHistory.length > 20) {
+        drawingHistory.shift();
+    }
+}
+
+function undo() {
+    if (drawingHistory.length <= 1) {
+        showNotification('Nothing to undo!', 'error');
+        return;
+    }
+    
+    
+    drawingHistory.pop();
+    
+  
+    const previousState = drawingHistory[drawingHistory.length - 1];
+    ctx.putImageData(previousState, 0, 0);
+    
+    showNotification('Undo - Last stroke removed', 'info');
+}
 function handleCanvasClick(e) {
     if (currentTool !== 'textbox') return;
 
@@ -1677,11 +1713,6 @@ function createTextBox(x, y) {
 /* ---------------------------
    ANNOTATION ACTIONS
 --------------------------- */
-function undo() {
-    // Clear the annotation canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    showNotification('Undo - Clear last stroke', 'info');
-}
 
 function clearAnnotations() {
     if (!confirm('Clear all annotations? This will keep your traffic plan but remove drawings and text.')) return;
@@ -1696,6 +1727,11 @@ function clearAnnotations() {
 
 function downloadPlan() {
     console.log('Download button clicked!');
+    
+    // Don't show notification - it appears in print preview
+    // showNotification('Opening print dialog... Select "Save as PDF" to download', 'info');
+    
+    // Trigger print dialog immediately
     window.print();
 }
 
