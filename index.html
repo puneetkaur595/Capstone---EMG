@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>EMG Traffic Plan Designer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -22,23 +25,37 @@
             --text-secondary: #9aa0a6;
             --border: #2d3356;
             --shadow: 0 4px 20px rgba(0,0,0,0.4);
+            /* Touch targets - minimum 44px for accessibility */
+            --touch-target: 44px;
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
             background: linear-gradient(135deg, var(--bg-main) 0%, #1a1f3a 100%);
             color: var(--text-primary);
             min-height: 100vh;
             overflow-x: hidden;
+            /* Prevent text selection during drag on mobile */
+            -webkit-user-select: none;
+            user-select: none;
+            /* Prevent pull-to-refresh */
+            overscroll-behavior: none;
         }
-        .container { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        /* Allow text selection only where needed */
+        input, textarea, [contenteditable], .sign-name, .sign-id { 
+            -webkit-user-select: text; 
+            user-select: text; 
+        }
+
+        .container { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
         .header {
             background: var(--bg-card);
-            padding: 1.5rem 2rem;
+            padding: 0.75rem 1rem;
             border-bottom: 2px solid var(--primary);
             box-shadow: var(--shadow);
             position: relative;
             overflow: hidden;
+            flex-shrink: 0;
         }
         .header::before {
             content: '';
@@ -49,31 +66,54 @@
             animation: shimmer 3s infinite;
         }
         @keyframes shimmer { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
         .header h1 {
-            font-size: 1.75rem;
+            font-size: clamp(1rem, 3.5vw, 1.5rem);
             font-weight: 700;
-            margin-bottom: 0.5rem;
             letter-spacing: -0.02em;
             background: linear-gradient(135deg, var(--primary), var(--accent));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            white-space: nowrap;
         }
-        .header p { color: var(--text-secondary); font-size: 0.95rem; }
-        .plan-info {
-            margin-top: 0.75rem;
-            padding: 0.75rem;
+        .header-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+            display: none;
+        }
+
+        /* ===========================
+           MOBILE SIDE PANEL TOGGLE
+        =========================== */
+        .panel-toggle-btn {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
             background: var(--bg-hover);
-            border-radius: 6px;
-            border-left: 3px solid var(--accent);
-            font-size: 0.9rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            flex-shrink: 0;
         }
+
         .main-grid {
             display: grid;
-            grid-template-columns: 320px 1fr;
+            grid-template-columns: 300px 1fr;
             flex: 1;
             overflow: hidden;
             gap: 0;
+            min-height: 0;
         }
         .sign-library {
             background: var(--bg-card);
@@ -81,136 +121,191 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            transition: transform 0.3s ease, width 0.3s ease;
         }
-        .sign-library h2 {
-            padding: 1.25rem 1.5rem;
-            font-size: 1.1rem;
+        .sign-library-header {
+            padding: 0.875rem 1rem;
+            font-size: 0.95rem;
             font-weight: 600;
             background: var(--bg-hover);
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 0.5rem;
+            flex-shrink: 0;
         }
+        .sign-library-title { display: flex; align-items: center; gap: 0.4rem; }
+        .panel-close-btn {
+            display: none;
+            width: 32px; height: 32px;
+            background: var(--danger);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            min-height: unset;
+            padding: 0;
+            margin-left: auto;
+        }
+        body.mobile-ui .panel-close-btn { display: flex; }
         #signTotal { color: var(--accent); font-weight: 700; }
         .search-box {
-            padding: 1rem 1.5rem;
+            padding: 0.75rem 1rem;
             background: var(--bg-main);
             border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
         }
         #searchBox {
             width: 100%;
-            padding: 0.75rem 1rem;
+            padding: 0.625rem 0.875rem;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
             color: var(--text-primary);
             font-size: 0.9rem;
             transition: all 0.2s;
+            min-height: var(--touch-target);
         }
         #searchBox:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
         }
-        #signList { flex: 1; overflow-y: auto; padding: 1rem; }
-        #signList::-webkit-scrollbar { width: 8px; }
+        #signList { flex: 1; overflow-y: auto; padding: 0.75rem; }
+        #signList::-webkit-scrollbar { width: 6px; }
         #signList::-webkit-scrollbar-track { background: var(--bg-main); }
         #signList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         #signList::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
         .sign-item {
             background: var(--bg-hover);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 0.75rem;
-            margin-bottom: 0.75rem;
+            padding: 0.625rem;
+            margin-bottom: 0.625rem;
             cursor: grab;
             transition: all 0.2s;
             display: flex;
-            gap: 0.75rem;
+            gap: 0.625rem;
             align-items: center;
+            touch-action: none;
         }
         .sign-item:hover {
             border-color: var(--primary);
-            transform: translateX(4px);
-            box-shadow: -4px 0 0 var(--primary);
+            transform: translateX(3px);
+            box-shadow: -3px 0 0 var(--primary);
         }
-        .sign-item:active { cursor: grabbing; transform: scale(0.98); }
+        .sign-item:active { cursor: grabbing; transform: scale(0.97); }
         .sign-item img {
-            width: 50px; height: 50px;
+            width: 44px; height: 44px;
             object-fit: contain;
             flex-shrink: 0;
             background: white;
-            padding: 4px;
+            padding: 3px;
             border-radius: 4px;
         }
         .sign-info { flex: 1; min-width: 0; }
         .sign-id {
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--primary);
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.2rem;
         }
         .sign-name {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         .sign-category {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: var(--accent);
-            margin-top: 0.25rem;
+            margin-top: 0.2rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        .canvas-container { display: flex; flex-direction: column; overflow: hidden; background: var(--bg-main); }
+        /* Mobile: tap to add sign button */
+        .sign-add-btn {
+            display: none;
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .canvas-container { display: flex; flex-direction: column; overflow: hidden; background: var(--bg-main); min-width: 0; }
         .controls {
-            padding: 1.25rem 1.5rem;
+            padding: 0.75rem 1rem;
             background: var(--bg-card);
             border-bottom: 1px solid var(--border);
             display: flex;
-            gap: 1rem;
+            gap: 0.625rem;
             align-items: center;
             flex-wrap: wrap;
+            flex-shrink: 0;
         }
-        .plan-title-bar {
+        #planSelect {
             flex: 1;
-            min-width: 250px;
-            padding: 0.75rem 1rem;
+            min-width: 180px;
+            padding: 0.625rem 0.875rem;
             background: var(--bg-hover);
             border: 1px solid var(--border);
-            border-left: 3px solid var(--accent);
             border-radius: 8px;
-            font-size: 0.95rem;
+            color: var(--text-primary);
+            font-size: 0.875rem;
             font-weight: 600;
+            cursor: pointer;
+            min-height: var(--touch-target);
         }
         button {
-            padding: 0.75rem 1.5rem;
+            padding: 0.625rem 1.125rem;
             border: none;
             border-radius: 8px;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
+            min-height: var(--touch-target);
+            white-space: nowrap;
         }
+        .btn-view-plan { background: var(--secondary); color: white; display: none; }
+        .btn-view-plan:hover { background: #00365f; transform: translateY(-1px); }
+        body.mobile-ui .btn-view-plan { display: flex; }
         .btn-save { background: var(--success); color: white; }
         .btn-save:hover { background: #05c293; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(6, 214, 160, 0.3); }
         .btn-clear { background: var(--danger); color: white; }
         .btn-clear:hover { background: #e63462; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239, 71, 111, 0.3); }
         .sign-count {
-            padding: 0.75rem 1.25rem;
+            padding: 0.625rem 1rem;
             background: var(--bg-hover);
             border: 1px solid var(--border);
             border-radius: 8px;
             font-weight: 600;
             color: var(--text-secondary);
+            font-size: 0.85rem;
+            min-height: var(--touch-target);
+            display: flex;
+            align-items: center;
         }
-        .sign-count span { color: var(--accent); font-size: 1.1rem; }
+        .sign-count span { color: var(--accent); font-size: 1rem; margin-right: 0.25rem; }
         #canvas {
             flex: 1;
             position: relative;
@@ -219,6 +314,7 @@
             background-position: center;
             background-repeat: no-repeat;
             background-color: #1a1f3a;
+            touch-action: none;
         }
         #canvas.drag-over {
             outline: 3px dashed var(--primary);
@@ -232,13 +328,16 @@
             text-align: center;
             color: var(--text-secondary);
             pointer-events: none;
+            padding: 1rem;
         }
-        .placed-sign { position: absolute; cursor: move; z-index: 10; transition: transform 0.2s; }
+        .placed-sign { position: absolute; cursor: move; z-index: 10; transition: transform 0.1s; }
         .placed-sign:hover { z-index: 100; }
         .placed-sign:hover .sign-controls { opacity: 1; }
+        .placed-sign.selected { z-index: 100; }
+        .placed-sign.selected .sign-controls { opacity: 1; }
         .sign-controls {
             position: absolute;
-            top: -35px; left: 50%;
+            top: -38px; left: 50%;
             transform: translateX(-50%);
             display: flex;
             gap: 4px;
@@ -249,9 +348,10 @@
             border-radius: 6px;
             border: 1px solid var(--border);
             box-shadow: var(--shadow);
+            z-index: 101;
         }
         .sign-btn {
-            width: 28px; height: 28px;
+            width: 32px; height: 32px;
             padding: 0;
             border-radius: 4px;
             font-size: 1rem;
@@ -261,55 +361,58 @@
             background: var(--bg-hover);
             color: var(--text-primary);
             border: 1px solid var(--border);
+            min-height: unset;
         }
         .btn-rotate { background: var(--secondary); color: white; }
         .btn-rotate:hover { background: #00365f; }
         .btn-remove { background: var(--danger); color: white; }
         .btn-remove:hover { background: #e63462; }
         .placed-sign img {
-            width: 70px; height: 70px;
+            width: 64px; height: 64px;
             object-fit: contain;
             background: white;
-            padding: 6px;
+            padding: 5px;
             border-radius: 6px;
             border: 2px solid var(--primary);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: block;
         }
         .sign-label {
             position: absolute;
-            bottom: -24px; left: 50%;
+            bottom: -22px; left: 50%;
             transform: translateX(-50%);
             background: var(--bg-card);
-            padding: 3px 8px;
+            padding: 2px 7px;
             border-radius: 4px;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 600;
             white-space: nowrap;
             border: 1px solid var(--border);
             color: var(--primary);
         }
-        .loading { padding: 3rem; text-align: center; color: var(--text-secondary); }
+        .loading { padding: 2rem; text-align: center; color: var(--text-secondary); }
         .loading-spinner {
-            width: 40px; height: 40px;
+            width: 36px; height: 36px;
             border: 3px solid var(--border);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            margin: 0 auto 1rem;
+            margin: 0 auto 0.75rem;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .notification {
             position: fixed;
-            top: 20px; right: 20px;
+            top: 16px; right: 16px;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-left: 4px solid var(--primary);
-            padding: 1rem 1.5rem;
+            padding: 0.875rem 1.25rem;
             border-radius: 8px;
             box-shadow: var(--shadow);
-            z-index: 1000;
+            z-index: 9999;
             animation: slideIn 0.3s ease;
-            max-width: 400px;
+            max-width: min(380px, calc(100vw - 32px));
+            font-size: 0.875rem;
         }
         @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .notification.success { border-left-color: var(--success); }
@@ -320,52 +423,53 @@
         =========================== */
         .annotation-layout {
             display: grid;
-            grid-template-columns: 280px 1fr;
+            grid-template-columns: 260px 1fr;
             flex: 1;
             overflow: hidden;
             gap: 0;
+            min-height: 0;
         }
 
         .annotation-toolbar {
             background: var(--bg-card);
             border-right: 1px solid var(--border);
-            padding: 1.5rem;
+            padding: 1rem;
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 0.875rem;
             overflow-y: auto;
+            transition: transform 0.3s ease;
         }
 
-        .annotation-toolbar h2 {
-            font-size: 1.1rem;
+        .annotation-toolbar > h2 {
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 0.5rem;
         }
 
         .tool-section {
             background: var(--bg-hover);
-            padding: 1rem;
+            padding: 0.75rem;
             border-radius: 8px;
             border: 1px solid var(--border);
         }
 
         .tool-section label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.625rem;
         }
 
         .tool-buttons {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
 
         .tool-btn {
-            padding: 0.75rem;
+            padding: 0.5rem 0.4rem;
             border: 1px solid var(--border);
             background: var(--bg-card);
             border-radius: 6px;
@@ -374,10 +478,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.35rem;
-            font-size: 0.7rem;
+            gap: 0.25rem;
+            font-size: 0.65rem;
             font-weight: 600;
             color: var(--text-secondary);
+            min-height: var(--touch-target);
+            justify-content: center;
         }
 
         .tool-btn svg { background: transparent; }
@@ -385,38 +491,34 @@
         .tool-btn:hover {
             border-color: var(--primary);
             color: var(--primary);
-            transform: translateY(-2px);
         }
 
         .tool-btn.active {
             border-color: var(--primary);
-            background: rgba(255, 107, 53, 0.1);
+            background: rgba(255, 107, 53, 0.12);
             color: var(--primary);
         }
 
         .color-picker {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.4rem;
             flex-wrap: wrap;
         }
 
         .color-btn {
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border: 3px solid transparent;
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
         }
 
-        .color-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-
+        .color-btn:hover { transform: scale(1.1); }
         .color-btn.active {
             border-color: var(--text-primary);
             transform: scale(1.15);
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
         }
 
         .slider {
@@ -426,112 +528,87 @@
             background: var(--border);
             outline: none;
             -webkit-appearance: none;
+            cursor: pointer;
         }
 
         .slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             background: var(--primary);
             cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .slider::-webkit-slider-thumb:hover {
-            background: var(--primary-dark);
-            transform: scale(1.2);
         }
 
         .slider::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             background: var(--primary);
             cursor: pointer;
             border: none;
-            transition: all 0.2s;
-        }
-
-        .slider::-moz-range-thumb:hover {
-            background: var(--primary-dark);
-            transform: scale(1.2);
         }
 
         .action-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
             margin-top: auto;
         }
 
         .btn-action {
-            padding: 0.75rem;
+            padding: 0.625rem 0.5rem;
             border: none;
             border-radius: 8px;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            min-height: var(--touch-target);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
         }
 
-        .btn-undo {
-            background: var(--accent);
-            color: var(--bg-main);
-        }
+        .btn-undo { background: var(--accent); color: var(--bg-main); }
+        .btn-undo:hover { background: #e0a801; transform: translateY(-1px); }
+        .btn-undo:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-        .btn-undo:hover {
-            background: #e0a801;
-            transform: translateY(-1px);
-        }
+        .btn-redo { background: #6c5ce7; color: white; }
+        .btn-redo:hover { background: #5a4dd4; transform: translateY(-1px); }
+        .btn-redo:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
-        .btn-clear-annotations {
-            background: var(--danger);
-            color: white;
-        }
+        .btn-clear-annotations { background: var(--danger); color: white; }
+        .btn-clear-annotations:hover { background: #e63462; transform: translateY(-1px); }
 
-        .btn-clear-annotations:hover {
-            background: #e63462;
-            transform: translateY(-1px);
-        }
+        .btn-back { background: var(--secondary); color: white; }
+        .btn-back:hover { background: #00365f; transform: translateY(-1px); }
 
-        .btn-back {
-            background: var(--secondary);
-            color: white;
-        }
+        .btn-download { background: var(--success); color: white; }
+        .btn-download:hover { background: #05c293; transform: translateY(-1px); }
 
-        .btn-back:hover {
-            background: #00365f;
-            transform: translateY(-1px);
-        }
-
-        .btn-download {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-download:hover {
-            background: #05c293;
-            transform: translateY(-1px);
-        }
+        /* Full-width buttons in action area */
+        .btn-action.full-width { grid-column: 1 / -1; }
 
         .annotation-canvas-container {
             position: relative;
             background: #1a1f3a;
             overflow: hidden;
+            flex: 1;
         }
 
         #annotationCanvas {
             display: block;
             cursor: crosshair;
             background: transparent;
+            touch-action: none;
         }
 
         #textBoxContainer {
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             width: 100%;
             height: 100%;
             pointer-events: none;
@@ -539,7 +616,7 @@
 
         .text-box {
             position: absolute;
-            padding: 0.5rem 0.75rem;
+            padding: 0.4rem 0.625rem;
             background: rgba(255, 255, 255, 0.95);
             border: 2px dashed var(--primary);
             border-radius: 6px;
@@ -547,9 +624,11 @@
             font-weight: 600;
             cursor: move;
             pointer-events: auto;
-            min-width: 100px;
-            min-height: 30px;
+            min-width: 80px;
+            min-height: 28px;
             color: #000;
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         .text-box:focus {
@@ -560,10 +639,8 @@
 
         .text-box-remove {
             position: absolute;
-            top: -10px;
-            right: -10px;
-            width: 24px;
-            height: 24px;
+            top: -10px; right: -10px;
+            width: 24px; height: 24px;
             border-radius: 50%;
             background: var(--danger);
             color: white;
@@ -576,65 +653,132 @@
             justify-content: center;
             opacity: 0;
             transition: opacity 0.2s;
+            min-height: unset;
         }
 
-        .text-box:hover .text-box-remove {
-            opacity: 1;
+        .text-box:hover .text-box-remove { opacity: 1; }
+        .text-box-remove:hover { background: #e63462; transform: scale(1.1); }
+
+        /* Mobile floating toolbar for annotation page */
+        .mobile-toolbar-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 52px;
+            height: 52px;
+            background: var(--primary);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.4rem;
+            cursor: pointer;
+            z-index: 500;
+            box-shadow: 0 4px 16px rgba(255, 107, 53, 0.5);
+            align-items: center;
+            justify-content: center;
+            min-height: unset;
         }
 
-        .text-box-remove:hover {
-            background: #e63462;
-            transform: scale(1.1);
+        /* History counter badge */
+        .history-info {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 0.3rem;
+            background: var(--bg-main);
+            border-radius: 4px;
+            margin-top: -0.25rem;
         }
+        .history-info span { color: var(--accent); font-weight: 600; }
 
-        @media (max-width: 1024px) { 
-            .main-grid, .annotation-layout { 
-                grid-template-columns: 280px 1fr; 
-            } 
-        }
-        @media (max-width: 768px) {
-            .main-grid, .annotation-layout { 
-                grid-template-columns: 1fr; 
-                grid-template-rows: 40vh 1fr; 
-            }
-            .sign-library, .annotation-toolbar { 
-                border-right: none; 
-                border-bottom: 1px solid var(--border); 
-            }
-            .controls { 
-                flex-direction: column; 
-                align-items: stretch; 
-            }
-            .plan-title-bar { 
-                min-width: 0; 
-            }
-            .tool-buttons {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
+        /* ===========================
+           RESPONSIVE — driven by body.mobile-ui set from UA string only.
+           Viewport width is NEVER used to decide layout (breaks with DevTools open).
+           body.mobile-ui = phones and tablets (UA-detected)
+           default (no class) = desktop/laptop — always two-column sidebar layout
+        =========================== */
 
-        /* Print Styles - Only show the canvas/annotation area */
+        /* Mobile/tablet: slide-in panels */
+        body.mobile-ui .panel-toggle-btn { display: flex; }
+        body.mobile-ui .panel-close-btn { display: flex; }
+        body.mobile-ui .sign-add-btn { display: flex; }
+        body.mobile-ui .btn-view-plan { display: flex; }
+        body.mobile-ui .header { padding: 0.625rem 0.875rem; }
+        body.mobile-ui .sign-count { display: none; }
+
+        body.mobile-ui .main-grid {
+            grid-template-columns: 1fr;
+            position: relative;
+        }
+        body.mobile-ui .sign-library {
+            position: absolute;
+            top: 0; left: 0;
+            width: 280px; height: 100%;
+            z-index: 200;
+            transform: translateX(-100%);
+            box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+        }
+        body.mobile-ui .sign-library.panel-open { transform: translateX(0); }
+        /* Overlay is hidden by default and never a grid item */
+        .sign-library-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 199;
+        }
+        .sign-library-overlay.visible { display: block; }
+        body.mobile-ui .sign-library-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 199;
+        }
+        body.mobile-ui .sign-library-overlay.visible { display: block; }
+        body.mobile-ui .canvas-container { grid-column: 1; }
+        body.mobile-ui .controls { padding: 0.5rem 0.75rem; gap: 0.4rem; }
+        body.mobile-ui #planSelect { min-width: 0; flex: 1; font-size: 0.8rem; }
+        body.mobile-ui button { padding: 0.5rem 0.75rem; font-size: 0.78rem; }
+
+        body.mobile-ui .annotation-layout {
+            grid-template-columns: 1fr;
+            position: relative;
+        }
+        body.mobile-ui .annotation-toolbar {
+            position: absolute;
+            top: 0; left: 0;
+            width: 280px; height: 100%;
+            z-index: 200;
+            transform: translateX(-100%);
+            box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+            padding: 1rem;
+        }
+        body.mobile-ui .annotation-toolbar.panel-open { transform: translateX(0); }
+        body.mobile-ui .annotation-canvas-container { grid-column: 1; }
+        body.mobile-ui .mobile-toolbar-toggle { display: flex; }
+        body.mobile-ui .tool-buttons { grid-template-columns: repeat(4, 1fr); }
+        body.mobile-ui .action-buttons { grid-template-columns: repeat(3, 1fr); }
+        body.mobile-ui .btn-action.full-width { grid-column: 1 / -1; }
+
+        body.mobile-ui.small-phone .header h1 { font-size: 0.95rem; }
+        body.mobile-ui.small-phone .sign-library { width: 260px; }
+        body.mobile-ui.small-phone .annotation-toolbar { width: 260px; }
+        body.mobile-ui.small-phone .placed-sign img { width: 52px; height: 52px; }
+
+        /* Print Styles */
         @media print {
-            /* Force hide everything we don't want */
-            .header,
-            .sign-library,
-            .annotation-toolbar,
-            .controls,
-            .notification,
-            .tool-section,
-            .action-buttons,
-            h2,
-            h1,
-            p,
-            label,
-            button,
-            input,
-            select {
+            .header, .sign-library, .annotation-toolbar,
+            .controls, .notification, .tool-section,
+            .action-buttons, h2, h1, p, label, button,
+            input, select, .panel-toggle-btn, .mobile-toolbar-toggle {
                 display: none !important;
                 visibility: hidden !important;
             }
             
-            /* Force the page layout */
             html, body {
                 margin: 0 !important;
                 padding: 0 !important;
@@ -643,77 +787,50 @@
                 overflow: hidden !important;
             }
             
-            /* Set page size and margins */
-            @page {
-                size: portrait;
-                margin: 0;
-            }
+            @page { size: portrait; margin: 0; }
             
-            /* Hide page 1 if it's showing */
-            #page1 {
-                display: none !important;
-            }
+            #page1 { display: none !important; }
             
-            /* Show and expand page 2 */
             #page2 {
                 display: block !important;
                 position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                margin: 0 !important;
-                padding: 0 !important;
+                top: 0 !important; left: 0 !important;
+                width: 100vw !important; height: 100vh !important;
+                margin: 0 !important; padding: 0 !important;
             }
             
-            /* Force annotation layout to take full space */
             .annotation-layout {
                 display: block !important;
                 grid-template-columns: none !important;
                 position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                margin: 0 !important;
-                padding: 0 !important;
+                top: 0 !important; left: 0 !important;
+                width: 100vw !important; height: 100vh !important;
+                margin: 0 !important; padding: 0 !important;
             }
             
-            /* Force canvas container to take full space */
             .annotation-canvas-container {
                 position: fixed !important;
-                top: 0 !important;
-                left: 50% !important;
+                top: 0 !important; left: 50% !important;
                 transform: translateX(-50%) scaleX(1.85) !important;
                 transform-origin: center top !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                margin: 0 !important;
-                padding: 0 !important;
+                width: 100vw !important; height: 100vh !important;
+                margin: 0 !important; padding: 0 !important;
                 background: white !important;
             }
             
-            /* Make canvases fill container */
-            #baseCanvas,
-            #annotationCanvas {
+            #baseCanvas, #annotationCanvas {
                 display: block !important;
                 position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                max-width: 100% !important;
-                max-height: 100vh !important;
+                top: 0 !important; left: 0 !important;
+                width: 100% !important; height: 100% !important;
+                max-width: 100% !important; max-height: 100vh !important;
             }
             
-            /* Show text boxes */
             #textBoxContainer {
                 display: block !important;
                 position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
+                top: 0 !important; left: 0 !important;
+                width: 100% !important; height: 100% !important;
                 pointer-events: none !important;
             }
             
@@ -723,10 +840,7 @@
                 pointer-events: none !important;
             }
             
-            /* Hide text box remove buttons */
-            .text-box-remove {
-                display: none !important;
-            }
+            .text-box-remove { display: none !important; }
         }
     </style>
 </head>
@@ -734,14 +848,23 @@
     <!-- PAGE 1: Sign Placement -->
     <div id="page1" class="container">
         <div class="header">
-            <h1>🚧 EMG Traffic Plan Designer</h1>
-            <p>Drag signs from the library to customize your traffic control plan</p>
+            <div class="header-top">
+                <button class="panel-toggle-btn" id="libraryToggle" title="Toggle Sign Library" onclick="toggleSignLibrary()">☰</button>
+                <h1>🚧 EMG Traffic Plan Designer</h1>
+            </div>
+            <div class="header-subtitle">Drag or tap signs to place on your plan</div>
         </div>
-        <div class="main-grid">
-            <div class="sign-library">
-                <h2>📋 Sign Library (<span id="signTotal">0</span>)</h2>
+        <div class="main-grid" id="mainGrid">
+            <!-- Mobile overlay -->
+            <div class="sign-library-overlay" id="libraryOverlay" onclick="closeSignLibrary()"></div>
+            
+            <div class="sign-library" id="signLibrary">
+                <div class="sign-library-header">
+                    <div class="sign-library-title">📋 Signs (<span id="signTotal">0</span>)</div>
+                    <button class="panel-close-btn" onclick="closeSignLibrary()" title="Close panel">✕</button>
+                </div>
                 <div class="search-box">
-                    <input id="searchBox" placeholder="🔍 Search signs..." />
+                    <input id="searchBox" placeholder="🔍 Search signs..." autocomplete="off" autocorrect="off" />
                 </div>
                 <div id="signList">
                     <div class="loading">
@@ -750,19 +873,20 @@
                     </div>
                 </div>
             </div>
+            
             <div class="canvas-container">
                 <div class="controls">
-                    <select id="planSelect" style="flex: 1; min-width: 250px; padding: 0.75rem 1rem; background: var(--bg-hover); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 0.95rem; font-weight: 600; cursor: pointer;">
+                    <select id="planSelect">
                         <option value="">Select Traffic Plan Layout...</option>
                     </select>
-                    <button class="btn-save" onclick="goToAnnotation()">Next: Annotate →</button>
-                    <button class="btn-clear" onclick="clearAll()">🗑️ Clear All</button>
-                    <div class="sign-count"><span id="signCount">0</span> signs placed</div>
+                    <button class="btn-view-plan" onclick="closeSignLibrary()" title="Close library and view plan">View Plan 👁️</button>
+                    <button class="btn-save" onclick="goToAnnotation()">Next ✏️</button>
+                    <button class="btn-clear" onclick="clearAll()">🗑️ Clear</button>
+                    <div class="sign-count"><span id="signCount">0</span> placed</div>
                 </div>
                 <div id="canvas">
-                    <div class="empty-canvas">
-                        <p style="font-size:17px;font-weight:600">⬅️ Drag signs from the library</p>
-                        <p style="font-size:13px;margin-top:8px">Drop them on the plan to place</p>
+                    <div class="empty-canvas" id="emptyCanvasMsg">
+                        <!-- Text is set by JS based on detected device -->
                     </div>
                 </div>
             </div>
@@ -772,18 +896,23 @@
     <!-- PAGE 2: Annotation & Drawing -->
     <div id="page2" class="container" style="display:none;">
         <div class="header">
-            <h1>✏️ Annotate Your Traffic Plan</h1>
-            <p>Add notes, highlights, and text boxes to finalize your plan</p>
+            <div class="header-top">
+                <button class="panel-toggle-btn" id="toolbarToggle" title="Toggle Toolbar" onclick="toggleAnnotationToolbar()">🎨</button>
+                <h1>✏️ Annotate Traffic Plan</h1>
+            </div>
         </div>
-        <div class="annotation-layout">
-            <div class="annotation-toolbar">
+        <div class="annotation-layout" id="annotationLayout">
+            <!-- Mobile overlay -->
+            <div class="sign-library-overlay" id="toolbarOverlay" onclick="closeAnnotationToolbar()"></div>
+            
+            <div class="annotation-toolbar" id="annotationToolbar">
                 <h2>🎨 Drawing Tools</h2>
                 
                 <div class="tool-section">
                     <label>Tool:</label>
                     <div class="tool-buttons">
                         <button class="tool-btn active" data-tool="pen" title="Pen">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
                                 <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
                                 <path d="M2 2l7.586 7.586"></path>
@@ -791,14 +920,14 @@
                             Pen
                         </button>
                         <button class="tool-btn" data-tool="highlighter" title="Highlighter">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 11l-6 6v3h9l3-3"></path>
                                 <path d="M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"></path>
                             </svg>
                             Highlight
                         </button>
                         <button class="tool-btn" data-tool="textbox" title="Text Box">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="4 7 4 4 20 4 20 7"></polyline>
                                 <line x1="9" y1="20" x2="15" y2="20"></line>
                                 <line x1="12" y1="4" x2="12" y2="20"></line>
@@ -806,7 +935,7 @@
                             Text
                         </button>
                         <button class="tool-btn" data-tool="eraser" title="Eraser">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M20 20H7L3 16l5-5 5 5 7-7"></path>
                             </svg>
                             Eraser
@@ -817,13 +946,13 @@
                 <div class="tool-section">
                     <label>Color:</label>
                     <div class="color-picker">
-                        <button class="color-btn active" data-color="#ef4444" style="background:#ef4444"></button>
-                        <button class="color-btn" data-color="#f97316" style="background:#f97316"></button>
-                        <button class="color-btn" data-color="#eab308" style="background:#eab308"></button>
-                        <button class="color-btn" data-color="#22c55e" style="background:#22c55e"></button>
-                        <button class="color-btn" data-color="#3b82f6" style="background:#3b82f6"></button>
-                        <button class="color-btn" data-color="#8b5cf6" style="background:#8b5cf6"></button>
-                        <button class="color-btn" data-color="#000000" style="background:#000000"></button>
+                        <button class="color-btn active" data-color="#ef4444" style="background:#ef4444" title="Red"></button>
+                        <button class="color-btn" data-color="#f97316" style="background:#f97316" title="Orange"></button>
+                        <button class="color-btn" data-color="#eab308" style="background:#eab308" title="Yellow"></button>
+                        <button class="color-btn" data-color="#22c55e" style="background:#22c55e" title="Green"></button>
+                        <button class="color-btn" data-color="#3b82f6" style="background:#3b82f6" title="Blue"></button>
+                        <button class="color-btn" data-color="#8b5cf6" style="background:#8b5cf6" title="Purple"></button>
+                        <button class="color-btn" data-color="#000000" style="background:#000000" title="Black"></button>
                     </div>
                 </div>
 
@@ -833,7 +962,7 @@
                 </div>
 
                 <div class="tool-section">
-                    <label>Highlighter Size: <span id="highlighterSizeValue">8</span>px</label>
+                    <label>Highlight Size: <span id="highlighterSizeValue">8</span>px</label>
                     <input type="range" id="highlighterSize" min="3" max="30" value="8" class="slider">
                 </div>
 
@@ -842,11 +971,16 @@
                     <input type="range" id="textSize" min="10" max="48" value="16" class="slider">
                 </div>
 
+                <div class="history-info" id="historyInfo">
+                    History: <span id="undoCount">0</span> steps · <span id="redoCount">0</span> redo
+                </div>
+
                 <div class="action-buttons">
-                    <button class="btn-action btn-undo" onclick="undo()">↶ Undo</button>
+                    <button class="btn-action btn-undo" id="undoBtn" onclick="undo()" title="Undo (Ctrl+Z)">↶ Undo</button>
+                    <button class="btn-action btn-redo" id="redoBtn" onclick="redo()" title="Redo (Ctrl+Y)">↷ Redo</button>
                     <button class="btn-action btn-clear-annotations" onclick="clearAnnotations()">🗑️ Clear</button>
                     <button class="btn-action btn-back" onclick="goBackToDesign()">← Back</button>
-                    <button class="btn-action btn-download" onclick="downloadPlan()">💾 Download</button>
+                    <button class="btn-action btn-download full-width" onclick="downloadPlan()">💾 Download PDF</button>
                 </div>
             </div>
 
@@ -856,6 +990,9 @@
                 <div id="textBoxContainer"></div>
             </div>
         </div>
+
+        <!-- Mobile floating toolbar toggle -->
+        <button class="mobile-toolbar-toggle" onclick="toggleAnnotationToolbar()" title="Tools">🎨</button>
     </div>
 
 <script>
@@ -879,12 +1016,59 @@ let penSize = 3;
 let highlighterSize = 8;
 let textSize = 16;
 let isDrawing = false;
-let drawingHistory = [];
+let lastTouchX = 0, lastTouchY = 0;
+
+// REDO/UNDO HISTORY
+let drawingHistory = [];    // stack of past states (for undo)
+let redoStack = [];         // stack of undone states (for redo)
+const MAX_HISTORY = 30;
+
 let currentPath = [];
 let textBoxes = [];
 let canvas, ctx;
-let tempCanvas, tempCtx; // Temporary canvas for highlighter
 
+/* ---------------------------
+   MOBILE PANEL TOGGLE
+--------------------------- */
+function toggleSignLibrary() {
+    const lib = document.getElementById('signLibrary');
+    const overlay = document.getElementById('libraryOverlay');
+    const isOpen = lib.classList.contains('panel-open');
+    if (isOpen) {
+        lib.classList.remove('panel-open');
+        overlay.classList.remove('visible');
+    } else {
+        lib.classList.add('panel-open');
+        overlay.classList.add('visible');
+    }
+}
+
+function closeSignLibrary() {
+    document.getElementById('signLibrary').classList.remove('panel-open');
+    document.getElementById('libraryOverlay').classList.remove('visible');
+}
+
+function toggleAnnotationToolbar() {
+    const tb = document.getElementById('annotationToolbar');
+    const overlay = document.getElementById('toolbarOverlay');
+    const isOpen = tb.classList.contains('panel-open');
+    if (isOpen) {
+        tb.classList.remove('panel-open');
+        overlay.classList.remove('visible');
+    } else {
+        tb.classList.add('panel-open');
+        overlay.classList.add('visible');
+    }
+}
+
+function closeAnnotationToolbar() {
+    document.getElementById('annotationToolbar').classList.remove('panel-open');
+    document.getElementById('toolbarOverlay').classList.remove('visible');
+}
+
+/* ---------------------------
+   UTILITY
+--------------------------- */
 function getURLParams() {
     const params = new URLSearchParams(window.location.search);
     return {
@@ -933,6 +1117,13 @@ function normalizeKey(k) {
     return k ? k.toString().trim().replace(/\s+/g,'').replace(/_/g,'').toLowerCase() : '';
 }
 
+function escapeHtml(s) {
+    if (!s) return '';
+    return s.toString().replace(/[&<>"']/g, m => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[m]));
+}
+
 function parseSignRows(rows) {
     const signs = [];
     rows.forEach(row => {
@@ -963,17 +1154,12 @@ function parseLayoutRows(rows) {
     const layouts = [];
     rows.forEach(row => {
         const map = {};
-        Object.keys(row).forEach(k => {
-            map[normalizeKey(k)] = row[k];
-        });
-
+        Object.keys(row).forEach(k => { map[normalizeKey(k)] = row[k]; });
         const id = map.typicallayoutid || map.id || map.layoutid;
         const title = map.typicallayouttitle || map.title || map.name;
         const roadType = map.roadtype || map.type;
         const planPhoto = map.planphoto || map.photo || map.image;
-
         if (!id || !title || !planPhoto) return;
-
         layouts.push({
             id: id.toString().trim(),
             title: title.toString().trim(),
@@ -986,41 +1172,33 @@ function parseLayoutRows(rows) {
 
 async function loadFromGoogleSheets() {
     try {
-        console.log('Loading signs from Google Sheets...');
         const signsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SIGNS_SHEET)}`;
         const signsResponse = await fetch(signsUrl);
         if (signsResponse.ok) {
             const signsText = await signsResponse.text();
             Papa.parse(signsText, {
-                header: true,
-                skipEmptyLines: true,
+                header: true, skipEmptyLines: true,
                 complete: function(results) {
                     allSigns = parseSignRows(results.data);
                     document.getElementById('signTotal').textContent = allSigns.length;
                     loadSignLibrary(allSigns);
-                    console.log(`✅ Loaded ${allSigns.length} signs`);
                 }
             });
         }
 
-        // Load the Layout Plans sheet
-        console.log('Loading layouts from Google Sheets...');
         const layoutsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(LAYOUTS_SHEET)}`;
         const layoutsResponse = await fetch(layoutsUrl);
         if (layoutsResponse.ok) {
             const layoutsText = await layoutsResponse.text();
             Papa.parse(layoutsText, {
-                header: true,
-                skipEmptyLines: true,
+                header: true, skipEmptyLines: true,
                 complete: function(results) {
                     allLayouts = parseLayoutRows(results.data);
                     populateLayoutDropdown(allLayouts);
-                    console.log(`✅ Loaded ${allLayouts.length} layouts`);
                 }
             });
         }
 
-        // Check if URL has parameters (opened from AppSheet)
         loadPlanFromURL();
     } catch (error) {
         console.error('Error loading from Google Sheets:', error);
@@ -1030,43 +1208,32 @@ async function loadFromGoogleSheets() {
 
 function loadPlanFromURL() {
     const params = getURLParams();
-    console.log('URL Parameters:', params);
-    
     if (params.planPhoto) {
         currentPlanImageUrl = params.planPhoto;
         currentPlanInfo = params;
-        
-        const canvas = document.getElementById('canvas');
-        canvas.style.backgroundImage = `url(${params.planPhoto})`;
-        
-        const emptyCanvas = canvas.querySelector('.empty-canvas');
+        const cvs = document.getElementById('canvas');
+        cvs.style.backgroundImage = `url(${params.planPhoto})`;
+        const emptyCanvas = cvs.querySelector('.empty-canvas');
         if (emptyCanvas) emptyCanvas.remove();
-        
-        console.log('✅ Plan loaded from URL successfully');
+        const emptyMsg = cvs.querySelector('#emptyCanvasMsg');
+        if (emptyMsg) emptyMsg.remove();
         showNotification('Traffic plan loaded successfully', 'success');
-    } else {
-        console.log('No URL parameters - user can select from dropdown');
     }
 }
 
 function populateLayoutDropdown(layouts) {
     const select = document.getElementById('planSelect');
     select.innerHTML = '<option value="">Select Traffic Plan Layout...</option>';
-    
     if (!layouts || layouts.length === 0) {
         select.innerHTML += '<option disabled>No layouts available</option>';
         return;
     }
-
-    // Group layouts by their road type for better organization
     const grouped = {};
     layouts.forEach(layout => {
         const type = layout.roadType || 'Other';
         if (!grouped[type]) grouped[type] = [];
         grouped[type].push(layout);
     });
-
-    // Create dropdown groups for each road type
     Object.keys(grouped).sort().forEach(type => {
         const optgroup = document.createElement('optgroup');
         optgroup.label = type;
@@ -1075,7 +1242,7 @@ function populateLayoutDropdown(layouts) {
             option.value = layout.id;
             option.textContent = layout.title;
             option.dataset.imageUrl = layout.imageUrl;
-            option.dataset.title = layout.title;
+            option.dataset.title    = layout.title;
             option.dataset.roadType = layout.roadType;
             optgroup.appendChild(option);
         });
@@ -1085,12 +1252,10 @@ function populateLayoutDropdown(layouts) {
 
 function updatePlan() {
     const select = document.getElementById('planSelect');
-    const canvas = document.getElementById('canvas');
-    
+    const cvs = document.getElementById('canvas');
     if (select.value) {
         const selectedOption = select.options[select.selectedIndex];
         const imageUrl = selectedOption.dataset.imageUrl;
-        
         if (imageUrl) {
             currentPlanImageUrl = imageUrl;
             currentPlanInfo = {
@@ -1099,19 +1264,18 @@ function updatePlan() {
                 roadType: selectedOption.dataset.roadType,
                 planPhoto: imageUrl
             };
-            
-            canvas.style.backgroundImage = `url(${imageUrl})`;
-            
-            const emptyCanvas = canvas.querySelector('.empty-canvas');
+            cvs.style.backgroundImage = `url(${imageUrl})`;
+            const emptyCanvas = cvs.querySelector('.empty-canvas');
             if (emptyCanvas) emptyCanvas.remove();
-            
-            console.log('✅ Plan loaded:', selectedOption.textContent);
+            const emptyMsg = cvs.querySelector('#emptyCanvasMsg');
+            if (emptyMsg) emptyMsg.remove();
             showNotification('Plan loaded: ' + selectedOption.textContent, 'success');
+            closeSignLibrary(); // close panel on mobile so user can see the plan
         } else {
-            canvas.style.backgroundImage = '';
+            cvs.style.backgroundImage = '';
         }
     } else {
-        canvas.style.backgroundImage = '';
+        cvs.style.backgroundImage = '';
         currentPlanImageUrl = null;
         currentPlanInfo = {};
     }
@@ -1125,79 +1289,84 @@ function loadSignLibrary(signs) {
         return;
     }
     document.getElementById('signTotal').textContent = signs.length;
+
+    const isMobile = document.body.classList.contains('mobile-ui');
+
     signs.forEach(sign => {
         const signDiv = document.createElement('div');
         signDiv.className = 'sign-item';
         signDiv.draggable = true;
-        
+
         const img = document.createElement('img');
         img.alt = sign.id;
         img.src = sign.url || '';
         img.loading = 'lazy';
         img.onerror = function() {
-            if (sign.fileId) {
-                this.src = `https://drive.google.com/thumbnail?id=${sign.fileId}&sz=w200`;
-            }
+            if (sign.fileId) this.src = `https://drive.google.com/thumbnail?id=${sign.fileId}&sz=w200`;
         };
-        
+
         const infoDiv = document.createElement('div');
         infoDiv.className = 'sign-info';
         infoDiv.innerHTML = `<div class="sign-id">${escapeHtml(sign.id)}</div>
-                            <div class="sign-name">${escapeHtml(sign.name)}</div>
-                            ${sign.category ? `<div class="sign-category">${escapeHtml(sign.category)}</div>` : ''}`;
-        
+                             <div class="sign-name">${escapeHtml(sign.name)}</div>
+                             ${sign.category ? `<div class="sign-category">${escapeHtml(sign.category)}</div>` : ''}`;
+
+        // Mobile tap-to-add button
+        const addBtn = document.createElement('button');
+        addBtn.className = 'sign-add-btn';
+        addBtn.textContent = '+';
+        addBtn.title = 'Add to canvas';
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cvs = document.getElementById('canvas');
+            const rect = cvs.getBoundingClientRect();
+            // Place in center of canvas
+            const x = rect.width / 2 + (Math.random() - 0.5) * 100;
+            const y = rect.height / 2 + (Math.random() - 0.5) * 100;
+            addSign(sign, x, y);
+            showNotification(`Added: ${sign.id}`, 'success');
+            closeSignLibrary();
+        });
+
         signDiv.appendChild(img);
         signDiv.appendChild(infoDiv);
-        
+        signDiv.appendChild(addBtn);
+
+        // Desktop drag
         signDiv.addEventListener('dragstart', (e) => {
             draggedSign = sign;
-            try { e.dataTransfer.setData('text/plain', JSON.stringify(sign)); } catch (err) { }
+            try { e.dataTransfer.setData('text/plain', JSON.stringify(sign)); } catch (err) {}
             e.dataTransfer.effectAllowed = 'copy';
         });
-        
+
         signList.appendChild(signDiv);
     });
 }
 
+/* ---------------------------
+   CANVAS SETUP
+--------------------------- */
 function setupCanvas() {
-    const canvas = document.getElementById('canvas');
-    
-    canvas.addEventListener('dragover', (e) => {
+    const cvs = document.getElementById('canvas');
+
+    cvs.addEventListener('dragover', (e) => { e.preventDefault(); cvs.classList.add('drag-over'); });
+    cvs.addEventListener('dragleave', () => { cvs.classList.remove('drag-over'); });
+    cvs.addEventListener('drop', (e) => {
         e.preventDefault();
-        canvas.classList.add('drag-over');
-    });
-    
-    canvas.addEventListener('dragleave', () => {
-        canvas.classList.remove('drag-over');
-    });
-    
-    canvas.addEventListener('drop', (e) => {
-        e.preventDefault();
-        canvas.classList.remove('drag-over');
-        
+        cvs.classList.remove('drag-over');
         let sign = null;
         try {
             const raw = e.dataTransfer.getData('text/plain');
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (parsed && parsed.id) sign = parsed;
-            }
-        } catch (err) { }
-        
+            if (raw) { const parsed = JSON.parse(raw); if (parsed && parsed.id) sign = parsed; }
+        } catch (err) {}
         if (!sign) sign = draggedSign;
         if (!sign) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        addSign(sign, x, y);
+        const rect = cvs.getBoundingClientRect();
+        addSign(sign, e.clientX - rect.left, e.clientY - rect.top);
         draggedSign = null;
     });
 
-    // Plan selector change event
     document.getElementById('planSelect').addEventListener('change', updatePlan);
-    
     document.getElementById('searchBox').addEventListener('input', (e) => {
         const q = e.target.value.trim().toLowerCase();
         const filtered = allSigns.filter(s =>
@@ -1210,77 +1379,104 @@ function setupCanvas() {
 }
 
 function addSign(sign, x, y) {
-    const signId = Date.now() + Math.floor(Math.random()*1000);
+    const signId = Date.now() + Math.floor(Math.random() * 1000);
     const signData = { ...sign, x, y, rotation: 0, uniqueId: signId };
     placedSigns.push(signData);
     renderSign(signData);
     updateCount();
-    
-    const emptyCanvas = document.getElementById('canvas').querySelector('.empty-canvas');
-    if (emptyCanvas) emptyCanvas.remove();
+    const empty = document.getElementById('canvas').querySelector('.empty-canvas');
+    if (empty) empty.remove();
 }
 
 function renderSign(signData) {
-    const canvas = document.getElementById('canvas');
+    const cvs = document.getElementById('canvas');
     const signDiv = document.createElement('div');
     signDiv.className = 'placed-sign';
     signDiv.id = `sign-${signData.uniqueId}`;
     signDiv.style.left = `${signData.x}px`;
     signDiv.style.top = `${signData.y}px`;
     signDiv.style.transform = `translate(-50%,-50%) rotate(${signData.rotation}deg)`;
-    
+
     const controls = document.createElement('div');
     controls.className = 'sign-controls';
-    controls.innerHTML = `<button class="sign-btn btn-rotate" title="Rotate">↻</button>
-                        <button class="sign-btn btn-remove" title="Remove">×</button>`;
-    
+    controls.innerHTML = `<button class="sign-btn btn-rotate" title="Rotate 90°">↻</button>
+                          <button class="sign-btn btn-remove" title="Remove">×</button>`;
+
     const img = document.createElement('img');
     img.alt = signData.id;
     img.src = signData.url;
     img.onerror = function() {
         if (signData.fileId) this.src = `https://drive.google.com/thumbnail?id=${signData.fileId}&sz=w200`;
     };
-    
+
     const label = document.createElement('div');
     label.className = 'sign-label';
     label.textContent = signData.id;
-    
+
     controls.querySelector('.btn-rotate').addEventListener('click', () => rotateSign(signData.uniqueId));
     controls.querySelector('.btn-remove').addEventListener('click', () => removeSign(signData.uniqueId));
-    
+
     signDiv.appendChild(controls);
     signDiv.appendChild(img);
     signDiv.appendChild(label);
-    
-    let isDragging = false, startX=0, startY=0;
-    
+
+    // Desktop mouse drag
+    let isDragging = false, startX = 0, startY = 0;
     signDiv.addEventListener('mousedown', (e) => {
         if (e.target.closest('.sign-btn')) return;
         isDragging = true;
-        const rect = canvas.getBoundingClientRect();
+        signDiv.classList.add('selected');
+        const rect = cvs.getBoundingClientRect();
         startX = e.clientX - rect.left - signData.x;
         startY = e.clientY - rect.top - signData.y;
         signDiv.style.cursor = 'grabbing';
         e.preventDefault();
     });
-    
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-        const rect = canvas.getBoundingClientRect();
+        const rect = cvs.getBoundingClientRect();
         signData.x = e.clientX - rect.left - startX;
         signData.y = e.clientY - rect.top - startY;
         signDiv.style.left = `${signData.x}px`;
         signDiv.style.top = `${signData.y}px`;
     });
-    
     document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            signDiv.style.cursor = 'move';
-        }
+        if (isDragging) { isDragging = false; signDiv.style.cursor = 'move'; signDiv.classList.remove('selected'); }
     });
+
+    // Mobile touch drag
+    signDiv.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.sign-btn')) return;
+        const touch = e.touches[0];
+        const rect = cvs.getBoundingClientRect();
+        startX = touch.clientX - rect.left - signData.x;
+        startY = touch.clientY - rect.top - signData.y;
+        signDiv.classList.add('selected');
+        e.stopPropagation();
+    }, { passive: true });
     
-    canvas.appendChild(signDiv);
+    signDiv.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+        const rect = cvs.getBoundingClientRect();
+        signData.x = touch.clientX - rect.left - startX;
+        signData.y = touch.clientY - rect.top - startY;
+        signDiv.style.left = `${signData.x}px`;
+        signDiv.style.top = `${signData.y}px`;
+        e.stopPropagation();
+    }, { passive: true });
+
+    signDiv.addEventListener('touchend', () => {
+        signDiv.classList.remove('selected');
+    });
+
+    // Tap to show controls on mobile (toggle)
+    signDiv.addEventListener('touchend', (e) => {
+        if (e.target.closest('.sign-btn')) return;
+        const allControls = document.querySelectorAll('.placed-sign');
+        allControls.forEach(s => { if (s !== signDiv) s.classList.remove('selected'); });
+    });
+
+    cvs.appendChild(signDiv);
 }
 
 function rotateSign(uniqueId) {
@@ -1325,10 +1521,8 @@ function goToAnnotation() {
         showNotification('Please select a traffic plan first!', 'error');
         return;
     }
-
     document.getElementById('page1').style.display = 'none';
     document.getElementById('page2').style.display = 'flex';
-    
     initAnnotationCanvas();
 }
 
@@ -1341,35 +1535,29 @@ function goBackToDesign() {
    ANNOTATION CANVAS SETUP
 --------------------------- */
 function initAnnotationCanvas() {
-    // Base canvas (protected from eraser)
     const baseCanvas = document.getElementById('baseCanvas');
     const baseCtx = baseCanvas.getContext('2d');
-    
-    // Annotation canvas (for drawing)
+
     canvas = document.getElementById('annotationCanvas');
     ctx = canvas.getContext('2d');
 
     const container = canvas.parentElement;
     const width = container.clientWidth;
     const height = container.clientHeight;
-    
+
     baseCanvas.width = width;
     baseCanvas.height = height;
     canvas.width = width;
     canvas.height = height;
 
+    // Clear history stacks
     drawingHistory = [];
-	const initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        drawingHistory.push({
-    		     canvasData: initialState,
-                            textBoxes: []
-});
-    
-    tempCanvas = document.createElement('canvas');
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    tempCtx = tempCanvas.getContext('2d');
+    redoStack = [];
 
+    // Save initial blank state
+    const initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    drawingHistory.push({ canvasData: initialState, textBoxes: [] });
+    updateHistoryUI();
 
     captureDesignAsBackground(baseCanvas, baseCtx);
     setupDrawingTools();
@@ -1379,10 +1567,9 @@ async function captureDesignAsBackground(baseCanvas, baseCtx) {
     const designCanvas = document.getElementById('canvas');
     const bgStyle = designCanvas.style.backgroundImage;
     const bgUrl = bgStyle.match(/url\(["']?([^"']*)["']?\)/)?.[1];
-    
+
     if (bgUrl) {
         const img = new Image();
-        // Don't use crossOrigin to avoid CORS issues
         img.onload = function() {
             const scale = Math.min(baseCanvas.width / img.width, baseCanvas.height / img.height);
             const x = (baseCanvas.width - img.width * scale) / 2;
@@ -1390,10 +1577,7 @@ async function captureDesignAsBackground(baseCanvas, baseCtx) {
             baseCtx.drawImage(img, x, y, img.width * scale, img.height * scale);
             drawPlacedSignsOnCanvas(baseCanvas, baseCtx);
         };
-        img.onerror = function() {
-            console.log('Failed to load background image');
-            drawPlacedSignsOnCanvas(baseCanvas, baseCtx);
-        };
+        img.onerror = () => drawPlacedSignsOnCanvas(baseCanvas, baseCtx);
         img.src = bgUrl;
     } else {
         drawPlacedSignsOnCanvas(baseCanvas, baseCtx);
@@ -1401,43 +1585,26 @@ async function captureDesignAsBackground(baseCanvas, baseCtx) {
 }
 
 async function drawPlacedSignsOnCanvas(baseCanvas, baseCtx) {
-    console.log('Drawing', placedSigns.length, 'signs on annotation canvas');
-    
-    // Copy signs from the original canvas instead of re-loading images
-    const originalCanvas = document.getElementById('canvas');
-    
     for (const sign of placedSigns) {
         try {
-           
             const signElement = document.getElementById(`sign-${sign.uniqueId}`);
-            
             if (signElement) {
                 const signImg = signElement.querySelector('img');
-                
                 if (signImg && signImg.complete && signImg.naturalHeight !== 0) {
-                    // Image is loaded successfully, draw it
                     baseCtx.save();
                     baseCtx.translate(sign.x, sign.y);
                     baseCtx.rotate((sign.rotation * Math.PI) / 180);
-                    
                     try {
                         baseCtx.drawImage(signImg, -35, -35, 70, 70);
-                        console.log('✅ Drew sign from DOM:', sign.id);
                     } catch (err) {
-                        console.log('Could not draw from DOM element, trying URL:', sign.id);
-                        
                         await drawSignFromUrl(baseCtx, sign);
                     }
-                    
-                    
                     baseCtx.font = '600 11px sans-serif';
                     baseCtx.fillStyle = '#1e293b';
                     baseCtx.textAlign = 'center';
                     baseCtx.fillText(sign.id, 0, 50);
-                    
                     baseCtx.restore();
                 } else {
-                    
                     baseCtx.save();
                     baseCtx.translate(sign.x, sign.y);
                     baseCtx.rotate((sign.rotation * Math.PI) / 180);
@@ -1445,7 +1612,6 @@ async function drawPlacedSignsOnCanvas(baseCanvas, baseCtx) {
                     baseCtx.restore();
                 }
             } else {
-                // Sign element not found, try loading from URL
                 baseCtx.save();
                 baseCtx.translate(sign.x, sign.y);
                 baseCtx.rotate((sign.rotation * Math.PI) / 180);
@@ -1456,47 +1622,31 @@ async function drawPlacedSignsOnCanvas(baseCanvas, baseCtx) {
             console.error('Error processing sign:', sign.id, err);
         }
     }
-    
-    console.log('Finished drawing all signs');
 }
-
 
 async function drawSignFromUrl(ctx, sign) {
     return new Promise((resolve) => {
         const img = new Image();
-        
         img.onload = function() {
             try {
                 ctx.drawImage(img, -35, -35, 70, 70);
-                
                 ctx.font = '600 11px sans-serif';
                 ctx.fillStyle = '#1e293b';
                 ctx.textAlign = 'center';
                 ctx.fillText(sign.id, 0, 50);
-                
-                console.log('✅ Loaded from URL:', sign.id);
-            } catch (err) {
-                console.error('Error drawing from URL:', sign.id, err);
-            }
+            } catch (err) {}
             resolve();
         };
-        
         img.onerror = function() {
-            console.log('❌ Failed to load:', sign.id);
-            
-            // Draw placeholder
             ctx.fillStyle = '#ef4444';
             ctx.fillRect(-35, -35, 70, 70);
-            
             ctx.strokeStyle = '#dc2626';
             ctx.lineWidth = 2;
             ctx.strokeRect(-35, -35, 70, 70);
-            
             ctx.font = 'bold 10px sans-serif';
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            
             const id = sign.id;
             if (id.length > 8) {
                 ctx.fillText(id.substring(0, 8), 0, -5);
@@ -1504,19 +1654,10 @@ async function drawSignFromUrl(ctx, sign) {
             } else {
                 ctx.fillText(id, 0, 0);
             }
-            
             resolve();
         };
-        
         img.src = sign.url;
-        
-        // Timeout after 3 seconds
-        setTimeout(() => {
-            if (!img.complete) {
-                img.src = '';
-                img.onerror();
-            }
-        }, 3000);
+        setTimeout(() => { if (!img.complete) { img.src = ''; img.onerror(); } }, 3000);
     });
 }
 
@@ -1540,161 +1681,183 @@ function setupDrawingTools() {
         });
     });
 
-    const penSizeSlider = document.getElementById('penSize');
-    penSizeSlider.addEventListener('input', (e) => {
+    document.getElementById('penSize').addEventListener('input', (e) => {
         penSize = parseInt(e.target.value);
         document.getElementById('sizeValue').textContent = penSize;
     });
-
-    const highlighterSizeSlider = document.getElementById('highlighterSize');
-    highlighterSizeSlider.addEventListener('input', (e) => {
+    document.getElementById('highlighterSize').addEventListener('input', (e) => {
         highlighterSize = parseInt(e.target.value);
         document.getElementById('highlighterSizeValue').textContent = highlighterSize;
     });
-
-    const textSizeSlider = document.getElementById('textSize');
-    textSizeSlider.addEventListener('input', (e) => {
+    document.getElementById('textSize').addEventListener('input', (e) => {
         textSize = parseInt(e.target.value);
         document.getElementById('textSizeValue').textContent = textSize;
     });
 
+    // Mouse events
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing);
     canvas.addEventListener('mouseout', stopDrawing);
     canvas.addEventListener('click', handleCanvasClick);
+
+    // Touch events for mobile drawing
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', handleKeyboard);
 }
 
-function startDrawing(e) {
-    if (currentTool === 'textbox') return;
-    
-    isDrawing = true;
+/* ---------------------------
+   TOUCH DRAWING SUPPORT
+--------------------------- */
+function getTouchPos(touch) {
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top
+    };
+}
 
-    currentPath = [{ x, y }];
-
+function handleTouchStart(e) {
+    if (e.touches.length !== 1) return; // Only single touch for drawing
+    if (currentTool === 'textbox') {
+        e.preventDefault();
+        const pos = getTouchPos(e.touches[0]);
+        createTextBox(pos.x, pos.y);
+        return;
+    }
+    e.preventDefault();
+    const pos = getTouchPos(e.touches[0]);
+    lastTouchX = pos.x;
+    lastTouchY = pos.y;
     
+    // Simulate mousedown
+    startDrawingAt(pos.x, pos.y);
+}
+
+function handleTouchMove(e) {
+    if (e.touches.length !== 1 || !isDrawing) return;
+    e.preventDefault();
+    const pos = getTouchPos(e.touches[0]);
+    drawAt(pos.x, pos.y);
+    lastTouchX = pos.x;
+    lastTouchY = pos.y;
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    if (isDrawing) stopDrawing();
+}
+
+/* ---------------------------
+   DRAWING CORE
+--------------------------- */
+function getCtxSettings() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
     if (currentTool === 'eraser') {
-        // Eraser only erases the annotation layer
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = penSize * 5;
         ctx.globalAlpha = 1.0;
         ctx.strokeStyle = 'rgba(0,0,0,1)';
     } else if (currentTool === 'highlighter') {
-        // Highlighter - prevents darkening on overlaps
         ctx.globalCompositeOperation = 'lighten';
         ctx.lineWidth = highlighterSize * 4;
         ctx.globalAlpha = 1.0;
         ctx.lineCap = 'butt';
-        
-        
-        
         const r = parseInt(currentColor.slice(1, 3), 16);
         const g = parseInt(currentColor.slice(3, 5), 16);
         const b = parseInt(currentColor.slice(5, 7), 16);
         ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.20)`;
     } else {
-        // Regular pen
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1.0;
         ctx.lineWidth = penSize;
         ctx.strokeStyle = currentColor;
     }
+}
 
+function startDrawing(e) {
+    if (currentTool === 'textbox') return;
+    const rect = canvas.getBoundingClientRect();
+    startDrawingAt(e.clientX - rect.left, e.clientY - rect.top);
+}
+
+function startDrawingAt(x, y) {
+    if (currentTool === 'textbox') return;
+    isDrawing = true;
+    currentPath = [{ x, y }];
+    getCtxSettings();
     ctx.beginPath();
     ctx.moveTo(x, y);
 }
 
 function draw(e) {
     if (!isDrawing || currentTool === 'textbox') return;
-
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    drawAt(e.clientX - rect.left, e.clientY - rect.top);
+}
 
+function drawAt(x, y) {
+    if (!isDrawing) return;
     currentPath.push({ x, y });
-    
+    ctx.lineTo(x, y);
+    ctx.stroke();
     if (currentTool === 'highlighter') {
-        ctx.lineTo(x, y);
-        ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x, y);
-    } else {
-        // For pen and eraser
-        ctx.lineTo(x, y);
-        ctx.stroke();
     }
 }
 
 function stopDrawing() {
     if (!isDrawing) return;
-    
     isDrawing = false;
-    
-    // Reset to defaults
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     ctx.lineCap = 'round';
-    
-    // Save the canvas state to history after completing a stroke
+    // IMPORTANT: Clear redo stack when new action is performed
+    redoStack = [];
     saveDrawingState();
-    
     currentPath = [];
 }
+
 /* ---------------------------
-   DRAWING HISTORY MANAGEMENT
+   UNDO / REDO HISTORY
 --------------------------- */
 function saveDrawingState() {
-    // Save current canvas state
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    // Also save text boxes state
-    const textBoxState = textBoxes.map(tb => ({
+    const textBoxState = captureTextBoxState();
+
+    drawingHistory.push({ canvasData: imageData, textBoxes: textBoxState });
+
+    if (drawingHistory.length > MAX_HISTORY) {
+        drawingHistory.shift();
+    }
+
+    updateHistoryUI();
+}
+
+function captureTextBoxState() {
+    return textBoxes.map(tb => ({
         left: tb.style.left,
         top: tb.style.top,
         color: tb.style.color,
         fontSize: tb.style.fontSize,
-        text: tb.textContent.replace('×', '').trim()
+        text: tb.innerText.replace(/×\s*$/, '').trim()
     }));
-    
-    drawingHistory.push({
-        canvasData: imageData,
-        textBoxes: textBoxState
-    });
-    
-    // Keep only last 20 states to prevent memory issues
-    if (drawingHistory.length > 20) {
-        drawingHistory.shift();
-    }
 }
 
-function undo() {
-    if (drawingHistory.length <= 1) {
-        showNotification('Nothing to undo!', 'error');
-        return;
-    }
-    
-    // Remove current state
-    drawingHistory.pop();
-    
-    // Restore previous state
-    const previousState = drawingHistory[drawingHistory.length - 1];
-    
-    // Restore canvas
-    ctx.putImageData(previousState.canvasData, 0, 0);
-    
-    // Restore text boxes
+function restoreTextBoxState(textBoxState) {
     // Remove all current text boxes
     textBoxes.forEach(tb => tb.remove());
     textBoxes = [];
-    
-    // Recreate text boxes from saved state
-    previousState.textBoxes.forEach(tbData => {
+
+    // Recreate from saved state
+    textBoxState.forEach(tbData => {
         const textBox = document.createElement('div');
         textBox.className = 'text-box';
         textBox.contentEditable = true;
@@ -1710,23 +1873,137 @@ function undo() {
         removeBtn.onclick = () => {
             textBox.remove();
             textBoxes = textBoxes.filter(t => t !== textBox);
+            redoStack = [];
+            saveDrawingState();
         };
 
         textBox.appendChild(removeBtn);
+        setupTextBoxDrag(textBox);
         document.getElementById('textBoxContainer').appendChild(textBox);
         textBoxes.push(textBox);
     });
-    
-    showNotification('Undo - Last action removed', 'info');
 }
+
+function updateHistoryUI() {
+    const undoCount = Math.max(0, drawingHistory.length - 1);
+    const redoCount = redoStack.length;
+
+    document.getElementById('undoCount').textContent = undoCount;
+    document.getElementById('redoCount').textContent = redoCount;
+
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+
+    undoBtn.disabled = undoCount === 0;
+    redoBtn.disabled = redoCount === 0;
+}
+
+function undo() {
+    if (drawingHistory.length <= 1) {
+        showNotification('Nothing to undo!', 'error');
+        return;
+    }
+
+    // Pop current state into redo stack
+    const currentState = drawingHistory.pop();
+    redoStack.push(currentState);
+
+    // Restore previous state
+    const previousState = drawingHistory[drawingHistory.length - 1];
+    ctx.putImageData(previousState.canvasData, 0, 0);
+    restoreTextBoxState(previousState.textBoxes);
+
+    updateHistoryUI();
+    showNotification('Undo', 'info');
+}
+
+function redo() {
+    if (redoStack.length === 0) {
+        showNotification('Nothing to redo!', 'error');
+        return;
+    }
+
+    // Pop from redo stack back into history
+    const nextState = redoStack.pop();
+    drawingHistory.push(nextState);
+
+    // Restore that state
+    ctx.putImageData(nextState.canvasData, 0, 0);
+    restoreTextBoxState(nextState.textBoxes);
+
+    updateHistoryUI();
+    showNotification('Redo', 'info');
+}
+
+/* ---------------------------
+   KEYBOARD SHORTCUTS
+--------------------------- */
+function handleKeyboard(e) {
+    // Only when annotation page is active
+    if (document.getElementById('page2').style.display === 'none') return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+    }
+}
+
+/* ---------------------------
+   TEXT BOX
+--------------------------- */
 function handleCanvasClick(e) {
     if (currentTool !== 'textbox') return;
-
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    createTextBox(e.clientX - rect.left, e.clientY - rect.top);
+}
 
-    createTextBox(x, y);
+function setupTextBoxDrag(textBox) {
+    let isDragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
+
+    textBox.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('text-box-remove')) return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        origLeft = parseInt(textBox.style.left) || 0;
+        origTop = parseInt(textBox.style.top) || 0;
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        textBox.style.left = (origLeft + e.clientX - startX) + 'px';
+        textBox.style.top = (origTop + e.clientY - startY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) { isDragging = false; redoStack = []; saveDrawingState(); }
+    });
+
+    // Touch drag for text boxes
+    textBox.addEventListener('touchstart', (e) => {
+        if (e.target.classList.contains('text-box-remove')) return;
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        origLeft = parseInt(textBox.style.left) || 0;
+        origTop = parseInt(textBox.style.top) || 0;
+        isDragging = true;
+    }, { passive: true });
+
+    textBox.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        const touch = e.touches[0];
+        textBox.style.left = (origLeft + touch.clientX - startX) + 'px';
+        textBox.style.top = (origTop + touch.clientY - startY) + 'px';
+    }, { passive: true });
+
+    textBox.addEventListener('touchend', () => {
+        if (isDragging) { isDragging = false; redoStack = []; saveDrawingState(); }
+    });
 }
 
 function createTextBox(x, y) {
@@ -1737,7 +2014,7 @@ function createTextBox(x, y) {
     textBox.style.top = y + 'px';
     textBox.style.color = currentColor;
     textBox.style.fontSize = textSize + 'px';
-    textBox.textContent = 'Double click to edit';
+    textBox.textContent = 'Tap to edit';
 
     const removeBtn = document.createElement('button');
     removeBtn.className = 'text-box-remove';
@@ -1745,53 +2022,103 @@ function createTextBox(x, y) {
     removeBtn.onclick = () => {
         textBox.remove();
         textBoxes = textBoxes.filter(t => t !== textBox);
+        redoStack = [];
+        saveDrawingState();
     };
 
     textBox.appendChild(removeBtn);
+    setupTextBoxDrag(textBox);
     document.getElementById('textBoxContainer').appendChild(textBox);
     textBoxes.push(textBox);
 
-
+    // Clear redo on new action
+    redoStack = [];
     saveDrawingState();
 
     textBox.focus();
     document.execCommand('selectAll', false, null);
-}/* ---------------------------
+}
+
+/* ---------------------------
    ANNOTATION ACTIONS
 --------------------------- */
-
 function clearAnnotations() {
     if (!confirm('Clear all annotations? This will keep your traffic plan but remove drawings and text.')) return;
-    
-    // Clear only the annotation canvas (not the base canvas with the plan)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     textBoxes.forEach(tb => tb.remove());
     textBoxes = [];
+    // Clear redo, reset history
+    redoStack = [];
+    const blankState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    drawingHistory = [{ canvasData: blankState, textBoxes: [] }];
+    updateHistoryUI();
     showNotification('Annotations cleared', 'info');
 }
 
 function downloadPlan() {
-    console.log('Download button clicked!');
-    
-    // Don't show notification - it appears in print preview
-    // showNotification('Opening print dialog... Select "Save as PDF" to download', 'info');
-    
-    // Trigger print dialog immediately
     window.print();
 }
 
-function escapeHtml(s) {
-    if (!s) return '';
-    return s.toString().replace(/[&<>"']/g, function (m) {
-        return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m];
-    });
+function setCanvasHint() {
+    const el = document.getElementById('emptyCanvasMsg');
+    if (!el) return;
+    const isMobile = document.body.classList.contains('mobile-ui');
+    if (isMobile) {
+        el.innerHTML = `<p style="font-size:15px;font-weight:600">Tap ☰ to browse signs</p>
+                        <p style="font-size:12px;margin-top:8px;opacity:0.7">Then tap ＋ on any sign to place it</p>`;
+    } else {
+        el.innerHTML = `<p style="font-size:15px;font-weight:600">⬅️ Drag signs from the library</p>
+                        <p style="font-size:12px;margin-top:8px;opacity:0.7">Drop them on the plan to place</p>`;
+    }
 }
 
+/* ---------------------------
+   DEVICE DETECTION — UA string only, never viewport width.
+   Viewport width must not affect layout (breaks when DevTools is open).
+   Phones and tablets get mobile-ui (slide-in panels).
+   Everything else (laptops, desktops) gets the default two-column layout.
+--------------------------- */
+function detectDevice() {
+    const body = document.body;
+    const ua   = navigator.userAgent || '';
+
+    const isPhone  = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isTablet = /iPad|Android(?!.*Mobile)/i.test(ua);
+        const isIpadOS = /Macintosh/i.test(ua) && navigator.maxTouchPoints >= 5;
+
+    const isMobile = isPhone || isTablet || isIpadOS;
+
+    body.classList.remove('mobile-ui', 'small-phone');
+    if (isMobile) {
+        body.classList.add('mobile-ui');
+        if (isPhone && screen.width <= 380) body.classList.add('small-phone');
+    }
+
+    console.log(`Device: ${isMobile ? 'mobile' : 'desktop'} (maxTouch:${navigator.maxTouchPoints}, ua:${ua.substring(0,80)})`);
+    return isMobile ? 'mobile' : 'desktop';
+}
+
+/* ---------------------------
+   INIT
+--------------------------- */
 function init() {
+    detectDevice();
     setupCanvas();
+    setCanvasHint();
     loadFromGoogleSheets();
-    console.log('EMG Traffic Plan Designer ready');
+
+    // Re-detect on orientation change only (phone/tablet rotating).
+       // window on a laptop must not switch to mobile UI.
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => { detectDevice(); setCanvasHint(); }, 300);
+    });
+
+    // Prevent body scroll on iOS during drag
+    document.body.addEventListener('touchmove', (e) => {
+        if (e.target.closest('#canvas') || e.target.closest('#annotationCanvas')) {
+            // allow canvas-level touch handlers to handle this
+        }
+    }, { passive: true });
 }
 
 init();
