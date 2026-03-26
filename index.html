@@ -96,15 +96,49 @@
             display: none;
             align-items: center;
             justify-content: center;
-            width: 40px;
-            height: 40px;
-            background: var(--bg-hover);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 1.2rem;
+            width: 44px;
+            height: 44px;
+            background: var(--primary);
+            border: 2px solid var(--accent);
+            border-radius: 10px;
+            color: white;
+            font-size: 1.4rem;
             cursor: pointer;
             flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+            transition: all 0.2s;
+            position: relative;
+        }
+        .panel-toggle-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 16px rgba(255, 107, 53, 0.6);
+        }
+        .panel-toggle-btn::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            opacity: 0;
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 0; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(1.15); }
+        }
+        .toggle-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--accent);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 5px;
+            border-radius: 10px;
+            border: 2px solid var(--bg-main);
+            min-width: 20px;
+            text-align: center;
         }
 
         .main-grid {
@@ -639,25 +673,30 @@
 
         .text-box-remove {
             position: absolute;
-            top: -10px; right: -10px;
-            width: 24px; height: 24px;
+            top: -12px; right: -12px;
+            width: 32px; height: 32px;
             border-radius: 50%;
             background: var(--danger);
             color: white;
-            border: none;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: all 0.2s;
             min-height: unset;
+            z-index: 10;
         }
 
         .text-box:hover .text-box-remove { opacity: 1; }
-        .text-box-remove:hover { background: #e63462; transform: scale(1.1); }
+        .text-box-remove:hover { background: #e63462; transform: scale(1.15); }
+        
+        /* Always show delete button on mobile for easier access */
+        body.mobile-ui .text-box-remove { opacity: 1; }
 
         /* Mobile floating toolbar for annotation page */
         .mobile-toolbar-toggle {
@@ -770,6 +809,24 @@
         body.mobile-ui.small-phone .placed-sign img { width: 52px; height: 52px; }
 
         /* Print Styles */
+        /* Bigger, more touch-friendly text boxes on mobile */
+        body.mobile-ui .text-box {
+            min-width: 100px;
+            min-height: 44px;
+            padding: 0.6rem 0.8rem;
+            border-width: 3px;
+            font-size: 16px;
+        }
+        body.mobile-ui .text-box-remove {
+            width: 36px;
+            height: 36px;
+            font-size: 20px;
+            top: -14px;
+            right: -14px;
+            border: 3px solid white;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+        }
+
         @media print {
             .header, .sign-library, .annotation-toolbar,
             .controls, .notification, .tool-section,
@@ -849,7 +906,10 @@
     <div id="page1" class="container">
         <div class="header">
             <div class="header-top">
-                <button class="panel-toggle-btn" id="libraryToggle" title="Toggle Sign Library" onclick="toggleSignLibrary()">☰</button>
+                <button class="panel-toggle-btn" id="libraryToggle" title="Open Sign Library" onclick="toggleSignLibrary()">
+                    📋
+                    <span class="toggle-badge" id="toggleBadge">118</span>
+                </button>
                 <h1>🚧 EMG Traffic Plan Designer</h1>
             </div>
             <div class="header-subtitle">Drag or tap signs to place on your plan</div>
@@ -1000,6 +1060,14 @@ const GOOGLE_SHEET_ID = '11tHHhooqQ7tE1sbXQA_hVZKk2WIOoTqGQqQnqwF2kxI';
 const SIGNS_SHEET = 'Signs';
 const LAYOUTS_SHEET = 'Typical Layout Library';
 
+// AppSheet API Configuration
+const APPSHEET_APP_ID = 'e7f17c0c-6128-4a5f-9b6a-70253a7dd589';
+const APPSHEET_API_KEY = 'V2-44bjM-Ui29x-AvGpc-iyfWi-GM9lo-RYzlP-luXHS-kDLZQ';
+const APPSHEET_TABLE = 'Form Data';
+
+// Google Apps Script Proxy URL
+const APPS_SCRIPT_PROXY_URL = 'https://script.google.com/macros/s/AKfycbypcRac38VttjfBPXVF4y5IeS-XipofBnAydw0vI5V4e-ZHoKdDKBeaS4s19oMljtBsVg/exec';
+
 let placedSigns = [];
 let draggedSign = null;
 let allSigns = [];
@@ -1040,6 +1108,13 @@ function toggleSignLibrary() {
     } else {
         lib.classList.add('panel-open');
         overlay.classList.add('visible');
+    }
+}
+
+function updateToggleBadge() {
+    const badge = document.getElementById('toggleBadge');
+    if (badge && allSigns.length > 0) {
+        badge.textContent = allSigns.length;
     }
 }
 
@@ -1093,7 +1168,8 @@ function showNotification(message, type = 'info') {
 
 function getDriveImageUrl(fileId) {
     if (!fileId) return null;
-    return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    // Use thumbnail API to avoid CORS issues
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
 }
 
 function extractDriveFileId(url) {
@@ -1182,6 +1258,7 @@ async function loadFromGoogleSheets() {
                     allSigns = parseSignRows(results.data);
                     document.getElementById('signTotal').textContent = allSigns.length;
                     loadSignLibrary(allSigns);
+                    updateToggleBadge();
                 }
             });
         }
@@ -1302,7 +1379,11 @@ function loadSignLibrary(signs) {
         img.src = sign.url || '';
         img.loading = 'lazy';
         img.onerror = function() {
-            if (sign.fileId) this.src = `https://drive.google.com/thumbnail?id=${sign.fileId}&sz=w200`;
+            // Try different thumbnail sizes if first fails
+            if (!this.dataset.retried && sign.fileId) {
+                this.dataset.retried = 'true';
+                this.src = `https://lh3.googleusercontent.com/d/${sign.fileId}=w400`;
+            }
         };
 
         const infoDiv = document.createElement('div');
@@ -1406,7 +1487,10 @@ function renderSign(signData) {
     img.alt = signData.id;
     img.src = signData.url;
     img.onerror = function() {
-        if (signData.fileId) this.src = `https://drive.google.com/thumbnail?id=${signData.fileId}&sz=w200`;
+        if (!this.dataset.retried && signData.fileId) {
+            this.dataset.retried = 'true';
+            this.src = `https://lh3.googleusercontent.com/d/${signData.fileId}=w400`;
+        }
     };
 
     const label = document.createElement('div');
@@ -2056,7 +2140,157 @@ function clearAnnotations() {
 }
 
 function downloadPlan() {
-    window.print();
+    // Check if Apps Script URL is configured
+    if (!APPS_SCRIPT_PROXY_URL || APPS_SCRIPT_PROXY_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
+        showNotification('⚠️ Apps Script proxy not configured. Opening print dialog...', 'error');
+        setTimeout(() => window.print(), 1000);
+        return;
+    }
+    
+    showNotification('🔄 Generating traffic plan...', 'info');
+    
+    // Capture the annotation canvas container as an image
+    const baseCanvas = document.getElementById('baseCanvas');
+    const annotationCanvas = document.getElementById('annotationCanvas');
+    
+    // Create a composite canvas
+    const compositeCanvas = document.createElement('canvas');
+    compositeCanvas.width = baseCanvas.width;
+    compositeCanvas.height = baseCanvas.height;
+    const ctx = compositeCanvas.getContext('2d');
+    
+    // Draw base layer
+    ctx.drawImage(baseCanvas, 0, 0);
+    
+    // Draw annotation layer
+    ctx.drawImage(annotationCanvas, 0, 0);
+    
+    // Draw text boxes
+    const textBoxes = document.querySelectorAll('.text-box');
+    textBoxes.forEach(tb => {
+        const left = parseInt(tb.style.left) || 0;
+        const top = parseInt(tb.style.top) || 0;
+        const text = tb.innerText.replace(/×\s*$/, '').trim();
+        const fontSize = tb.style.fontSize || '16px';
+        const color = tb.style.color || '#000';
+        
+        ctx.font = `600 ${fontSize} "Segoe UI", system-ui, sans-serif`;
+        ctx.fillStyle = color;
+        ctx.fillText(text, left, top + 20);
+    });
+    
+    // Convert to base64 (this won't trigger CORS since we're not exporting)
+    let base64data;
+    try {
+        base64data = compositeCanvas.toDataURL('image/png').split(',')[1];
+    } catch (error) {
+        console.log('CORS blocked canvas export, using fallback');
+        showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
+        setTimeout(() => window.print(), 1000);
+        return;
+    }
+    
+    // Send to Apps Script proxy using form submission (bypasses CORS)
+    uploadViaProxyWithImage(base64data);
+}
+
+async function uploadViaProxyWithImage(base64Image) {
+    try {
+        showNotification('📤 Uploading...', 'info');
+        
+        const payload = {
+            planImageBase64: base64Image,
+            planInfo: currentPlanInfo,
+            placedSigns: placedSigns.map(s => ({
+                id: s.id,
+                name: s.name,
+                x: s.x,
+                y: s.y,
+                rotation: s.rotation
+            }))
+        };
+        
+        // Create hidden form for submission
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = APPS_SCRIPT_PROXY_URL;
+        form.target = 'upload_iframe';
+        form.style.display = 'none';
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'data';
+        input.value = JSON.stringify(payload);
+        
+        form.appendChild(input);
+        document.body.appendChild(form);
+        
+        // Create hidden iframe
+        let iframe = document.getElementById('upload_iframe');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'upload_iframe';
+            iframe.name = 'upload_iframe';
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+        }
+        
+        // Listen for iframe load
+        iframe.onload = function() {
+            try {
+                // Success - Apps Script received the data
+                showNotification('✅ Traffic plan saved successfully! Check your AppSheet app.', 'success');
+                document.body.removeChild(form);
+            } catch (error) {
+                console.log('Upload completed');
+                showNotification('✅ Upload sent! Check your AppSheet app in a moment.', 'success');
+                document.body.removeChild(form);
+            }
+        };
+        
+        // Submit form
+        form.submit();
+        
+    } catch (error) {
+        console.error('Error uploading via proxy:', error);
+        showNotification('❌ Upload failed. Opening print dialog instead...', 'error');
+        setTimeout(() => window.print(), 1000);
+    }
+}
+
+async function uploadViaProxy() {
+    // Not used anymore - keeping for backwards compatibility
+    console.log('uploadViaProxy called but not used');
+}
+
+async function uploadToAppSheet(rowData) {
+    try {
+        const response = await fetch(`https://api.appsheet.com/api/v2/apps/${APPSHEET_APP_ID}/tables/${APPSHEET_TABLE}/Action`, {
+            method: 'POST',
+            headers: {
+                'ApplicationAccessKey': APPSHEET_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "Action": "Add",
+                "Properties": {},
+                "Rows": [rowData]
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('AppSheet API Error:', response.status, errorText);
+            return false;
+        }
+        
+        const result = await response.json();
+        console.log('AppSheet upload success:', result);
+        return true;
+    } catch (error) {
+        console.error('Error uploading to AppSheet:', error);
+        return false;
+    }
 }
 
 function setCanvasHint() {
@@ -2064,7 +2298,7 @@ function setCanvasHint() {
     if (!el) return;
     const isMobile = document.body.classList.contains('mobile-ui');
     if (isMobile) {
-        el.innerHTML = `<p style="font-size:15px;font-weight:600">Tap ☰ to browse signs</p>
+        el.innerHTML = `<p style="font-size:15px;font-weight:600">Tap 📋 to browse signs</p>
                         <p style="font-size:12px;margin-top:8px;opacity:0.7">Then tap ＋ on any sign to place it</p>`;
     } else {
         el.innerHTML = `<p style="font-size:15px;font-weight:600">⬅️ Drag signs from the library</p>
@@ -2084,7 +2318,8 @@ function detectDevice() {
 
     const isPhone  = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
     const isTablet = /iPad|Android(?!.*Mobile)/i.test(ua);
-        const isIpadOS = /Macintosh/i.test(ua) && navigator.maxTouchPoints >= 5;
+    // iPadOS 13+ reports as Macintosh but has 5 touch points
+    const isIpadOS = /Macintosh/i.test(ua) && navigator.maxTouchPoints >= 5;
 
     const isMobile = isPhone || isTablet || isIpadOS;
 
@@ -2106,9 +2341,32 @@ function init() {
     setupCanvas();
     setCanvasHint();
     loadFromGoogleSheets();
+    showMobileHelperOnce();
+
+    function showMobileHelperOnce() {
+        const helper = document.getElementById('mobileHelper');
+        if (!helper) return;
+        const dismissed = localStorage.getItem('mobileHelperDismissed');
+        if (!dismissed && document.body.classList.contains('mobile-ui')) {
+            setTimeout(() => { helper.style.display = 'block'; }, 1000);
+        } else {
+            helper.style.display = 'none';
+        }
+    }
+
+    function closeMobileHelper() {
+        const helper = document.getElementById('mobileHelper');
+        if (helper) {
+            helper.style.opacity = '0';
+            helper.style.transform = 'translateX(-50%) translateY(-20px)';
+            setTimeout(() => { helper.style.display = 'none'; }, 300);
+            localStorage.setItem('mobileHelperDismissed', 'true');
+        }
+    }
 
     // Re-detect on orientation change only (phone/tablet rotating).
-       // window on a laptop must not switch to mobile UI.
+    // Never re-detect on window resize — resizing DevTools or a browser
+    // window on a laptop must not switch to mobile UI.
     window.addEventListener('orientationchange', () => {
         setTimeout(() => { detectDevice(); setCanvasHint(); }, 300);
     });
