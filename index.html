@@ -1065,6 +1065,7 @@ const APPSHEET_APP_ID = 'e7f17c0c-6128-4a5f-9b6a-70253a7dd589';
 const APPSHEET_API_KEY = 'V2-44bjM-Ui29x-AvGpc-iyfWi-GM9lo-RYzlP-luXHS-kDLZQ';
 const APPSHEET_TABLE = 'Form Data';
 
+// Cloudflare Worker URL (update after deployment)
 const BACKEND_API_URL = 'https://emg-traffic-plan-worker.jfox02544.workers.dev/';
 
 let placedSigns = [];
@@ -2139,9 +2140,9 @@ function clearAnnotations() {
 }
 
 function downloadPlan() {
-    // Check if Apps Script URL is configured
-    if (!APPS_SCRIPT_PROXY_URL || APPS_SCRIPT_PROXY_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
-        showNotification('⚠️ Apps Script proxy not configured. Opening print dialog...', 'error');
+    // Check if backend URL is configured
+    if (!BACKEND_API_URL || BACKEND_API_URL === 'YOUR_CLOUDFLARE_WORKER_URL_HERE') {
+        showNotification('⚠️ Cloudflare Worker not configured. Opening print dialog...', 'error');
         setTimeout(() => window.print(), 1000);
         return;
     }
@@ -2178,22 +2179,22 @@ function downloadPlan() {
         ctx.fillText(text, left, top + 20);
     });
     
-    // Convert to base64 (this won't trigger CORS since we're not exporting)
+    // Convert to base64
     let base64data;
     try {
         base64data = compositeCanvas.toDataURL('image/png').split(',')[1];
     } catch (error) {
-        console.log('CORS blocked canvas export, using fallback');
+        console.log('CORS blocked canvas export');
         showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
         setTimeout(() => window.print(), 1000);
         return;
     }
     
-    // Send to Apps Script proxy using form submission (bypasses CORS)
-    uploadViaProxyWithImage(base64data);
+    // Send to Vercel backend
+    uploadToBackend(base64data);
 }
 
-async function uploadViaProxyWithImage(base64Image) {
+async function uploadToBackend(base64Image) {
     try {
         showNotification('📤 Uploading...', 'info');
         
@@ -2209,57 +2210,29 @@ async function uploadViaProxyWithImage(base64Image) {
             }))
         };
         
-        // Create hidden form for submission
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = APPS_SCRIPT_PROXY_URL;
-        form.target = 'upload_iframe';
-        form.style.display = 'none';
+        const response = await fetch(BACKEND_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
         
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'data';
-        input.value = JSON.stringify(payload);
+        const result = await response.json();
         
-        form.appendChild(input);
-        document.body.appendChild(form);
-        
-        // Create hidden iframe
-        let iframe = document.getElementById('upload_iframe');
-        if (!iframe) {
-            iframe = document.createElement('iframe');
-            iframe.id = 'upload_iframe';
-            iframe.name = 'upload_iframe';
-            iframe.style.display = 'none';
-            document.body.appendChild(iframe);
+        if (result.success) {
+            showNotification('✅ Traffic plan saved successfully! Check your AppSheet app.', 'success');
+        } else {
+            console.error('Upload failed:', result);
+            showNotification('❌ Upload failed: ' + (result.error || 'Unknown error'), 'error');
+            setTimeout(() => window.print(), 1000);
         }
         
-        // Listen for iframe load
-        iframe.onload = function() {
-            try {
-                // Success - Apps Script received the data
-                showNotification('✅ Traffic plan saved successfully! Check your AppSheet app.', 'success');
-                document.body.removeChild(form);
-            } catch (error) {
-                console.log('Upload completed');
-                showNotification('✅ Upload sent! Check your AppSheet app in a moment.', 'success');
-                document.body.removeChild(form);
-            }
-        };
-        
-        // Submit form
-        form.submit();
-        
     } catch (error) {
-        console.error('Error uploading via proxy:', error);
+        console.error('Error uploading to backend:', error);
         showNotification('❌ Upload failed. Opening print dialog instead...', 'error');
         setTimeout(() => window.print(), 1000);
     }
-}
-
-async function uploadViaProxy() {
-    // Not used anymore - keeping for backwards compatibility
-    console.log('uploadViaProxy called but not used');
 }
 
 async function uploadToAppSheet(rowData) {
