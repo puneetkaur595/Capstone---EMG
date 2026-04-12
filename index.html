@@ -1210,17 +1210,36 @@ function parseSignRows(rows) {
         const category = map.category || map.type || '';
         const fileIdCol = map.drivefileid || map.fileid || map.imagefile;
         const driveLinkCol = map.drivewebviewlink || map.drivewebview || map.webviewlink || map.link;
+        
         if (!id || !name) return;
-        let finalId = null;
-        if (fileIdCol && fileIdCol.toString().trim() !== '') finalId = fileIdCol.toString().trim();
-        else if (driveLinkCol && driveLinkCol.toString().trim() !== '') finalId = extractDriveFileId(driveLinkCol);
-        if (!finalId) return;
+        
+        
+        let imageUrl = null;
+        if (driveLinkCol && driveLinkCol.toString().trim() !== '') {
+            const urlStr = driveLinkCol.toString().trim();
+            // If it's a GitHub URL, use it directly
+            if (urlStr.includes('raw.githubusercontent.com') || urlStr.includes('github.io')) {
+                imageUrl = urlStr;
+            } else {
+                // Otherwise, treat it as a Google Drive URL
+                const driveId = extractDriveFileId(urlStr);
+                if (driveId) {
+                    imageUrl = getDriveImageUrl(driveId);
+                }
+            }
+        } else if (fileIdCol && fileIdCol.toString().trim() !== '') {
+            // Fallback to Drive file ID column
+            imageUrl = getDriveImageUrl(fileIdCol.toString().trim());
+        }
+        
+        if (!imageUrl) return;
+        
         signs.push({
             id: id.toString().trim(),
             name: name.toString().trim(),
             category: category ? category.toString().trim() : '',
-            url: getDriveImageUrl(finalId),
-            fileId: finalId
+            url: imageUrl,
+            fileId: fileIdCol ? fileIdCol.toString().trim() : null
         });
     });
     return signs;
