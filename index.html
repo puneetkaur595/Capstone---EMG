@@ -1015,7 +1015,7 @@
                     <button class="btn-action btn-redo" id="redoBtn" onclick="redo()" title="Redo (Ctrl+Y)">↷ Redo</button>
                     <button class="btn-action btn-clear-annotations" onclick="clearAnnotations()">🗑️ Clear</button>
                     <button class="btn-action btn-back" onclick="goBackToDesign()">← Back</button>
-                    <button class="btn-action btn-download full-width" onclick="downloadPlan()">💾 Download PDF</button>
+                    <button class="btn-action btn-download full-width" onclick="()">💾 Download PDF</button>
                 </div>
             </div>
 
@@ -2107,7 +2107,7 @@ function downloadPlan() {
     
     let base64data;
     try {
-        base64data = compositeCanvas.toDataURL('image/png').split(',')[1];
+       base64data = compositeCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
     } catch (error) {
         console.log('CORS blocked canvas export:', error);
         showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
