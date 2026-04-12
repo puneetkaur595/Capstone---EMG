@@ -25,7 +25,6 @@
             --text-secondary: #9aa0a6;
             --border: #2d3356;
             --shadow: 0 4px 20px rgba(0,0,0,0.4);
-            /* Touch targets - minimum 44px for accessibility */
             --touch-target: 44px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -35,13 +34,10 @@
             color: var(--text-primary);
             min-height: 100vh;
             overflow-x: hidden;
-            /* Prevent text selection during drag on mobile */
             -webkit-user-select: none;
             user-select: none;
-            /* Prevent pull-to-refresh */
             overscroll-behavior: none;
         }
-        /* Allow text selection only where needed */
         input, textarea, [contenteditable], .sign-name, .sign-id { 
             -webkit-user-select: text; 
             user-select: text; 
@@ -89,9 +85,6 @@
             display: none;
         }
 
-        /* ===========================
-           MOBILE SIDE PANEL TOGGLE
-        =========================== */
         .panel-toggle-btn {
             display: none;
             align-items: center;
@@ -265,7 +258,6 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        /* Mobile: tap to add sign button */
         .sign-add-btn {
             display: none;
             width: 32px;
@@ -623,7 +615,6 @@
         .btn-download { background: var(--success); color: white; }
         .btn-download:hover { background: #05c293; transform: translateY(-1px); }
 
-        /* Full-width buttons in action area */
         .btn-action.full-width { grid-column: 1 / -1; }
 
         .annotation-canvas-container {
@@ -695,10 +686,8 @@
         .text-box:hover .text-box-remove { opacity: 1; }
         .text-box-remove:hover { background: #e63462; transform: scale(1.15); }
         
-        /* Always show delete button on mobile for easier access */
         body.mobile-ui .text-box-remove { opacity: 1; }
 
-        /* Mobile floating toolbar for annotation page */
         .mobile-toolbar-toggle {
             display: none;
             position: fixed;
@@ -719,7 +708,6 @@
             min-height: unset;
         }
 
-        /* History counter badge */
         .history-info {
             font-size: 0.7rem;
             color: var(--text-secondary);
@@ -732,13 +720,8 @@
         .history-info span { color: var(--accent); font-weight: 600; }
 
         /* ===========================
-           RESPONSIVE — driven by body.mobile-ui set from UA string only.
-           Viewport width is NEVER used to decide layout (breaks with DevTools open).
-           body.mobile-ui = phones and tablets (UA-detected)
-           default (no class) = desktop/laptop — always two-column sidebar layout
+           RESPONSIVE
         =========================== */
-
-        /* Mobile/tablet: slide-in panels */
         body.mobile-ui .panel-toggle-btn { display: flex; }
         body.mobile-ui .panel-close-btn { display: flex; }
         body.mobile-ui .sign-add-btn { display: flex; }
@@ -759,7 +742,6 @@
             box-shadow: 4px 0 20px rgba(0,0,0,0.5);
         }
         body.mobile-ui .sign-library.panel-open { transform: translateX(0); }
-        /* Overlay is hidden by default and never a grid item */
         .sign-library-overlay {
             display: none;
             position: fixed;
@@ -808,8 +790,6 @@
         body.mobile-ui.small-phone .annotation-toolbar { width: 260px; }
         body.mobile-ui.small-phone .placed-sign img { width: 52px; height: 52px; }
 
-        /* Print Styles */
-        /* Bigger, more touch-friendly text boxes on mobile */
         body.mobile-ui .text-box {
             min-width: 100px;
             min-height: 44px;
@@ -853,7 +833,6 @@
                 position: fixed !important;
                 top: 0 !important; left: 0 !important;
                 width: 100vw !important; height: 100vh !important;
-                margin: 0 !important; padding: 0 !important;
             }
             
             .annotation-layout {
@@ -915,7 +894,6 @@
             <div class="header-subtitle">Drag or tap signs to place on your plan</div>
         </div>
         <div class="main-grid" id="mainGrid">
-            <!-- Mobile overlay -->
             <div class="sign-library-overlay" id="libraryOverlay" onclick="closeSignLibrary()"></div>
             
             <div class="sign-library" id="signLibrary">
@@ -945,9 +923,7 @@
                     <div class="sign-count"><span id="signCount">0</span> placed</div>
                 </div>
                 <div id="canvas">
-                    <div class="empty-canvas" id="emptyCanvasMsg">
-                        <!-- Text is set by JS based on detected device -->
-                    </div>
+                    <div class="empty-canvas" id="emptyCanvasMsg"></div>
                 </div>
             </div>
         </div>
@@ -962,7 +938,6 @@
             </div>
         </div>
         <div class="annotation-layout" id="annotationLayout">
-            <!-- Mobile overlay -->
             <div class="sign-library-overlay" id="toolbarOverlay" onclick="closeAnnotationToolbar()"></div>
             
             <div class="annotation-toolbar" id="annotationToolbar">
@@ -1051,7 +1026,6 @@
             </div>
         </div>
 
-        <!-- Mobile floating toolbar toggle -->
         <button class="mobile-toolbar-toggle" onclick="toggleAnnotationToolbar()" title="Tools">🎨</button>
     </div>
 
@@ -1060,12 +1034,10 @@ const GOOGLE_SHEET_ID = '11tHHhooqQ7tE1sbXQA_hVZKk2WIOoTqGQqQnqwF2kxI';
 const SIGNS_SHEET = 'Signs';
 const LAYOUTS_SHEET = 'Typical Layout Library';
 
-// AppSheet API Configuration
 const APPSHEET_APP_ID = 'e7f17c0c-6128-4a5f-9b6a-70253a7dd589';
 const APPSHEET_API_KEY = 'V2-44bjM-Ui29x-AvGpc-iyfWi-GM9lo-RYzlP-luXHS-kDLZQ';
 const APPSHEET_TABLE = 'Form Data';
 
-// Cloudflare Worker URL (update after deployment)
 const BACKEND_API_URL = 'https://emg-traffic-plan-worker.jfox02544.workers.dev/';
 
 let placedSigns = [];
@@ -1086,9 +1058,8 @@ let textSize = 16;
 let isDrawing = false;
 let lastTouchX = 0, lastTouchY = 0;
 
-// REDO/UNDO HISTORY
-let drawingHistory = [];    // stack of past states (for undo)
-let redoStack = [];         // stack of undone states (for redo)
+let drawingHistory = [];
+let redoStack = [];
 const MAX_HISTORY = 30;
 
 let currentPath = [];
@@ -1168,7 +1139,6 @@ function showNotification(message, type = 'info') {
 
 function getDriveImageUrl(fileId) {
     if (!fileId) return null;
-    // Use thumbnail API to avoid CORS issues
     return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
 }
 
@@ -1213,22 +1183,18 @@ function parseSignRows(rows) {
         
         if (!id || !name) return;
         
-        
         let imageUrl = null;
         if (driveLinkCol && driveLinkCol.toString().trim() !== '') {
             const urlStr = driveLinkCol.toString().trim();
-            // If it's a GitHub URL, use it directly
             if (urlStr.includes('raw.githubusercontent.com') || urlStr.includes('github.io')) {
                 imageUrl = urlStr;
             } else {
-                // Otherwise, treat it as a Google Drive URL
                 const driveId = extractDriveFileId(urlStr);
                 if (driveId) {
                     imageUrl = getDriveImageUrl(driveId);
                 }
             }
         } else if (fileIdCol && fileIdCol.toString().trim() !== '') {
-            // Fallback to Drive file ID column
             imageUrl = getDriveImageUrl(fileIdCol.toString().trim());
         }
         
@@ -1309,8 +1275,6 @@ function loadPlanFromURL() {
         currentPlanInfo = params;
         const cvs = document.getElementById('canvas');
         cvs.style.backgroundImage = `url(${params.planPhoto})`;
-        const emptyCanvas = cvs.querySelector('.empty-canvas');
-        if (emptyCanvas) emptyCanvas.remove();
         const emptyMsg = cvs.querySelector('#emptyCanvasMsg');
         if (emptyMsg) emptyMsg.remove();
         showNotification('Traffic plan loaded successfully', 'success');
@@ -1361,12 +1325,10 @@ function updatePlan() {
                 planPhoto: imageUrl
             };
             cvs.style.backgroundImage = `url(${imageUrl})`;
-            const emptyCanvas = cvs.querySelector('.empty-canvas');
-            if (emptyCanvas) emptyCanvas.remove();
             const emptyMsg = cvs.querySelector('#emptyCanvasMsg');
             if (emptyMsg) emptyMsg.remove();
             showNotification('Plan loaded: ' + selectedOption.textContent, 'success');
-            closeSignLibrary(); // close panel on mobile so user can see the plan
+            closeSignLibrary();
         } else {
             cvs.style.backgroundImage = '';
         }
@@ -1386,8 +1348,6 @@ function loadSignLibrary(signs) {
     }
     document.getElementById('signTotal').textContent = signs.length;
 
-    const isMobile = document.body.classList.contains('mobile-ui');
-
     signs.forEach(sign => {
         const signDiv = document.createElement('div');
         signDiv.className = 'sign-item';
@@ -1395,12 +1355,13 @@ function loadSignLibrary(signs) {
 
         const img = document.createElement('img');
         img.alt = sign.id;
+        img.crossOrigin = 'anonymous'; // ← FIX 1: ensure CORS-clean cache entry
         img.src = sign.url || '';
         img.loading = 'lazy';
         img.onerror = function() {
-            // Try different thumbnail sizes if first fails
             if (!this.dataset.retried && sign.fileId) {
                 this.dataset.retried = 'true';
+                this.crossOrigin = 'anonymous';
                 this.src = `https://lh3.googleusercontent.com/d/${sign.fileId}=w400`;
             }
         };
@@ -1411,7 +1372,6 @@ function loadSignLibrary(signs) {
                              <div class="sign-name">${escapeHtml(sign.name)}</div>
                              ${sign.category ? `<div class="sign-category">${escapeHtml(sign.category)}</div>` : ''}`;
 
-        // Mobile tap-to-add button
         const addBtn = document.createElement('button');
         addBtn.className = 'sign-add-btn';
         addBtn.textContent = '+';
@@ -1420,7 +1380,6 @@ function loadSignLibrary(signs) {
             e.stopPropagation();
             const cvs = document.getElementById('canvas');
             const rect = cvs.getBoundingClientRect();
-            // Place in center of canvas
             const x = rect.width / 2 + (Math.random() - 0.5) * 100;
             const y = rect.height / 2 + (Math.random() - 0.5) * 100;
             addSign(sign, x, y);
@@ -1432,7 +1391,6 @@ function loadSignLibrary(signs) {
         signDiv.appendChild(infoDiv);
         signDiv.appendChild(addBtn);
 
-        // Desktop drag
         signDiv.addEventListener('dragstart', (e) => {
             draggedSign = sign;
             try { e.dataTransfer.setData('text/plain', JSON.stringify(sign)); } catch (err) {}
@@ -1504,10 +1462,12 @@ function renderSign(signData) {
 
     const img = document.createElement('img');
     img.alt = signData.id;
+    img.crossOrigin = 'anonymous'; // ← FIX 2: placed signs also need CORS attribute
     img.src = signData.url;
     img.onerror = function() {
         if (!this.dataset.retried && signData.fileId) {
             this.dataset.retried = 'true';
+            this.crossOrigin = 'anonymous';
             this.src = `https://lh3.googleusercontent.com/d/${signData.fileId}=w400`;
         }
     };
@@ -1523,7 +1483,6 @@ function renderSign(signData) {
     signDiv.appendChild(img);
     signDiv.appendChild(label);
 
-    // Desktop mouse drag
     let isDragging = false, startX = 0, startY = 0;
     signDiv.addEventListener('mousedown', (e) => {
         if (e.target.closest('.sign-btn')) return;
@@ -1547,7 +1506,6 @@ function renderSign(signData) {
         if (isDragging) { isDragging = false; signDiv.style.cursor = 'move'; signDiv.classList.remove('selected'); }
     });
 
-    // Mobile touch drag
     signDiv.addEventListener('touchstart', (e) => {
         if (e.target.closest('.sign-btn')) return;
         const touch = e.touches[0];
@@ -1572,7 +1530,6 @@ function renderSign(signData) {
         signDiv.classList.remove('selected');
     });
 
-    // Tap to show controls on mobile (toggle)
     signDiv.addEventListener('touchend', (e) => {
         if (e.target.closest('.sign-btn')) return;
         const allControls = document.querySelectorAll('.placed-sign');
@@ -1653,11 +1610,9 @@ function initAnnotationCanvas() {
     canvas.width = width;
     canvas.height = height;
 
-    // Clear history stacks
     drawingHistory = [];
     redoStack = [];
 
-    // Save initial blank state
     const initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
     drawingHistory.push({ canvasData: initialState, textBoxes: [] });
     updateHistoryUI();
@@ -1688,50 +1643,22 @@ async function captureDesignAsBackground(baseCanvas, baseCtx) {
     }
 }
 
+// ← FIX 3: Always re-fetch via drawSignFromUrl (which uses crossOrigin='anonymous')
+//    instead of reusing DOM <img> elements that may have been cached without CORS headers.
 async function drawPlacedSignsOnCanvas(baseCanvas, baseCtx) {
     for (const sign of placedSigns) {
-        try {
-            const signElement = document.getElementById(`sign-${sign.uniqueId}`);
-            if (signElement) {
-                const signImg = signElement.querySelector('img');
-                if (signImg && signImg.complete && signImg.naturalHeight !== 0) {
-                    baseCtx.save();
-                    baseCtx.translate(sign.x, sign.y);
-                    baseCtx.rotate((sign.rotation * Math.PI) / 180);
-                    try {
-                        baseCtx.drawImage(signImg, -35, -35, 70, 70);
-                    } catch (err) {
-                        await drawSignFromUrl(baseCtx, sign);
-                    }
-                    baseCtx.font = '600 11px sans-serif';
-                    baseCtx.fillStyle = '#1e293b';
-                    baseCtx.textAlign = 'center';
-                    baseCtx.fillText(sign.id, 0, 50);
-                    baseCtx.restore();
-                } else {
-                    baseCtx.save();
-                    baseCtx.translate(sign.x, sign.y);
-                    baseCtx.rotate((sign.rotation * Math.PI) / 180);
-                    await drawSignFromUrl(baseCtx, sign);
-                    baseCtx.restore();
-                }
-            } else {
-                baseCtx.save();
-                baseCtx.translate(sign.x, sign.y);
-                baseCtx.rotate((sign.rotation * Math.PI) / 180);
-                await drawSignFromUrl(baseCtx, sign);
-                baseCtx.restore();
-            }
-        } catch (err) {
-            console.error('Error processing sign:', sign.id, err);
-        }
+        baseCtx.save();
+        baseCtx.translate(sign.x, sign.y);
+        baseCtx.rotate((sign.rotation * Math.PI) / 180);
+        await drawSignFromUrl(baseCtx, sign);
+        baseCtx.restore();
     }
 }
 
 async function drawSignFromUrl(ctx, sign) {
     return new Promise((resolve) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        img.crossOrigin = 'anonymous'; // ← always set before src
         img.onload = function() {
             try {
                 ctx.drawImage(img, -35, -35, 70, 70);
@@ -1761,7 +1688,7 @@ async function drawSignFromUrl(ctx, sign) {
             }
             resolve();
         };
-        img.src = sign.url;
+        img.src = sign.url; // ← src set AFTER crossOrigin
         setTimeout(() => { if (!img.complete) { img.src = ''; img.onerror(); } }, 3000);
     });
 }
@@ -1799,19 +1726,16 @@ function setupDrawingTools() {
         document.getElementById('textSizeValue').textContent = textSize;
     });
 
-    // Mouse events
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing);
     canvas.addEventListener('mouseout', stopDrawing);
     canvas.addEventListener('click', handleCanvasClick);
 
-    // Touch events for mobile drawing
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
 
-    // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyboard);
 }
 
@@ -1827,7 +1751,7 @@ function getTouchPos(touch) {
 }
 
 function handleTouchStart(e) {
-    if (e.touches.length !== 1) return; // Only single touch for drawing
+    if (e.touches.length !== 1) return;
     if (currentTool === 'textbox') {
         e.preventDefault();
         const pos = getTouchPos(e.touches[0]);
@@ -1838,8 +1762,6 @@ function handleTouchStart(e) {
     const pos = getTouchPos(e.touches[0]);
     lastTouchX = pos.x;
     lastTouchY = pos.y;
-    
-    // Simulate mousedown
     startDrawingAt(pos.x, pos.y);
 }
 
@@ -1924,7 +1846,6 @@ function stopDrawing() {
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     ctx.lineCap = 'round';
-    // IMPORTANT: Clear redo stack when new action is performed
     redoStack = [];
     saveDrawingState();
     currentPath = [];
@@ -1957,11 +1878,9 @@ function captureTextBoxState() {
 }
 
 function restoreTextBoxState(textBoxState) {
-    // Remove all current text boxes
     textBoxes.forEach(tb => tb.remove());
     textBoxes = [];
 
-    // Recreate from saved state
     textBoxState.forEach(tbData => {
         const textBox = document.createElement('div');
         textBox.className = 'text-box';
@@ -2009,11 +1928,9 @@ function undo() {
         return;
     }
 
-    // Pop current state into redo stack
     const currentState = drawingHistory.pop();
     redoStack.push(currentState);
 
-    // Restore previous state
     const previousState = drawingHistory[drawingHistory.length - 1];
     ctx.putImageData(previousState.canvasData, 0, 0);
     restoreTextBoxState(previousState.textBoxes);
@@ -2028,11 +1945,9 @@ function redo() {
         return;
     }
 
-    // Pop from redo stack back into history
     const nextState = redoStack.pop();
     drawingHistory.push(nextState);
 
-    // Restore that state
     ctx.putImageData(nextState.canvasData, 0, 0);
     restoreTextBoxState(nextState.textBoxes);
 
@@ -2044,7 +1959,6 @@ function redo() {
    KEYBOARD SHORTCUTS
 --------------------------- */
 function handleKeyboard(e) {
-    // Only when annotation page is active
     if (document.getElementById('page2').style.display === 'none') return;
 
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -2088,7 +2002,6 @@ function setupTextBoxDrag(textBox) {
         if (isDragging) { isDragging = false; redoStack = []; saveDrawingState(); }
     });
 
-    // Touch drag for text boxes
     textBox.addEventListener('touchstart', (e) => {
         if (e.target.classList.contains('text-box-remove')) return;
         const touch = e.touches[0];
@@ -2136,7 +2049,6 @@ function createTextBox(x, y) {
     document.getElementById('textBoxContainer').appendChild(textBox);
     textBoxes.push(textBox);
 
-    // Clear redo on new action
     redoStack = [];
     saveDrawingState();
 
@@ -2152,7 +2064,6 @@ function clearAnnotations() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     textBoxes.forEach(tb => tb.remove());
     textBoxes = [];
-    // Clear redo, reset history
     redoStack = [];
     const blankState = ctx.getImageData(0, 0, canvas.width, canvas.height);
     drawingHistory = [{ canvasData: blankState, textBoxes: [] }];
@@ -2161,7 +2072,6 @@ function clearAnnotations() {
 }
 
 function downloadPlan() {
-    // Check if backend URL is configured
     if (!BACKEND_API_URL || BACKEND_API_URL === 'YOUR_CLOUDFLARE_WORKER_URL_HERE') {
         showNotification('⚠️ Cloudflare Worker not configured. Opening print dialog...', 'error');
         setTimeout(() => window.print(), 1000);
@@ -2170,48 +2080,41 @@ function downloadPlan() {
     
     showNotification('🔄 Generating traffic plan...', 'info');
     
-    // Capture the annotation canvas container as an image
     const baseCanvas = document.getElementById('baseCanvas');
     const annotationCanvas = document.getElementById('annotationCanvas');
     
-    // Create a composite canvas
     const compositeCanvas = document.createElement('canvas');
     compositeCanvas.width = baseCanvas.width;
     compositeCanvas.height = baseCanvas.height;
-    const ctx = compositeCanvas.getContext('2d');
+    const compositeCtx = compositeCanvas.getContext('2d');
     
-    // Draw base layer
-    ctx.drawImage(baseCanvas, 0, 0);
+    compositeCtx.drawImage(baseCanvas, 0, 0);
+    compositeCtx.drawImage(annotationCanvas, 0, 0);
     
-    // Draw annotation layer
-    ctx.drawImage(annotationCanvas, 0, 0);
-    
-    // Draw text boxes
-    const textBoxes = document.querySelectorAll('.text-box');
-    textBoxes.forEach(tb => {
+    // Draw text boxes onto composite
+    const allTextBoxes = document.querySelectorAll('.text-box');
+    allTextBoxes.forEach(tb => {
         const left = parseInt(tb.style.left) || 0;
         const top = parseInt(tb.style.top) || 0;
         const text = tb.innerText.replace(/×\s*$/, '').trim();
         const fontSize = tb.style.fontSize || '16px';
         const color = tb.style.color || '#000';
         
-        ctx.font = `600 ${fontSize} "Segoe UI", system-ui, sans-serif`;
-        ctx.fillStyle = color;
-        ctx.fillText(text, left, top + 20);
+        compositeCtx.font = `600 ${fontSize} "Segoe UI", system-ui, sans-serif`;
+        compositeCtx.fillStyle = color;
+        compositeCtx.fillText(text, left, top + 20);
     });
     
-    // Convert to base64
     let base64data;
     try {
         base64data = compositeCanvas.toDataURL('image/png').split(',')[1];
     } catch (error) {
-        console.log('CORS blocked canvas export');
+        console.log('CORS blocked canvas export:', error);
         showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
         setTimeout(() => window.print(), 1000);
         return;
     }
     
-    // Send to Vercel backend
     uploadToBackend(base64data);
 }
 
@@ -2233,9 +2136,7 @@ async function uploadToBackend(base64Image) {
         
         const response = await fetch(BACKEND_API_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         
@@ -2300,10 +2201,7 @@ function setCanvasHint() {
 }
 
 /* ---------------------------
-   DEVICE DETECTION — UA string only, never viewport width.
-   Viewport width must not affect layout (breaks when DevTools is open).
-   Phones and tablets get mobile-ui (slide-in panels).
-   Everything else (laptops, desktops) gets the default two-column layout.
+   DEVICE DETECTION
 --------------------------- */
 function detectDevice() {
     const body = document.body;
@@ -2311,7 +2209,6 @@ function detectDevice() {
 
     const isPhone  = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
     const isTablet = /iPad|Android(?!.*Mobile)/i.test(ua);
-    // iPadOS 13+ reports as Macintosh but has 5 touch points
     const isIpadOS = /Macintosh/i.test(ua) && navigator.maxTouchPoints >= 5;
 
     const isMobile = isPhone || isTablet || isIpadOS;
@@ -2334,41 +2231,13 @@ function init() {
     setupCanvas();
     setCanvasHint();
     loadFromGoogleSheets();
-    showMobileHelperOnce();
 
-    function showMobileHelperOnce() {
-        const helper = document.getElementById('mobileHelper');
-        if (!helper) return;
-        const dismissed = localStorage.getItem('mobileHelperDismissed');
-        if (!dismissed && document.body.classList.contains('mobile-ui')) {
-            setTimeout(() => { helper.style.display = 'block'; }, 1000);
-        } else {
-            helper.style.display = 'none';
-        }
-    }
-
-    function closeMobileHelper() {
-        const helper = document.getElementById('mobileHelper');
-        if (helper) {
-            helper.style.opacity = '0';
-            helper.style.transform = 'translateX(-50%) translateY(-20px)';
-            setTimeout(() => { helper.style.display = 'none'; }, 300);
-            localStorage.setItem('mobileHelperDismissed', 'true');
-        }
-    }
-
-    // Re-detect on orientation change only (phone/tablet rotating).
-    // Never re-detect on window resize — resizing DevTools or a browser
-    // window on a laptop must not switch to mobile UI.
     window.addEventListener('orientationchange', () => {
         setTimeout(() => { detectDevice(); setCanvasHint(); }, 300);
     });
 
-    // Prevent body scroll on iOS during drag
     document.body.addEventListener('touchmove', (e) => {
-        if (e.target.closest('#canvas') || e.target.closest('#annotationCanvas')) {
-            // allow canvas-level touch handlers to handle this
-        }
+        // allow canvas-level touch handlers to handle canvas touches
     }, { passive: true });
 }
 
