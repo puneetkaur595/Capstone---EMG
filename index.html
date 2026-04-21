@@ -1597,33 +1597,11 @@ function goBackToDesign() {
    ANNOTATION CANVAS SETUP
 --------------------------- */
 function initAnnotationCanvas() {
-   function initAnnotationCanvas() {
     const baseCanvas = document.getElementById('baseCanvas');
     const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true });
 
     canvas = document.getElementById('annotationCanvas');
     ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    const container = canvas.parentElement;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-
-    // Use device pixel ratio for sharper output
-    const dpr = window.devicePixelRatio || 1;
-
-    baseCanvas.width = width * dpr;
-    baseCanvas.height = height * dpr;
-    baseCanvas.style.width = width + 'px';
-    baseCanvas.style.height = height + 'px';
-
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-
-    // Scale all drawing operations by dpr
-    baseCtx.scale(dpr, dpr);
-    ctx.scale(dpr, dpr);
 
     const container = canvas.parentElement;
     const width = container.clientWidth;
@@ -2119,15 +2097,23 @@ async function downloadPlan() {
         compositeCtx.fillText(text, left, top + 20);
     });
 
-    let base64data;
-    try {
-       base64data = compositeCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-    } catch (error) {
-        console.log('CORS blocked canvas export:', error);
-        showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
-        setTimeout(() => window.print(), 1000);
-        return;
-    }
+   let base64data;
+try {
+    // Scale up 2x for sharper export
+    const exportCanvas = document.createElement('canvas');
+    const scale = 2;
+    exportCanvas.width = compositeCanvas.width * scale;
+    exportCanvas.height = compositeCanvas.height * scale;
+    const exportCtx = exportCanvas.getContext('2d');
+    exportCtx.scale(scale, scale);
+    exportCtx.drawImage(compositeCanvas, 0, 0);
+    base64data = exportCanvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+} catch (error) {
+    console.log('CORS blocked canvas export:', error);
+    showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
+    setTimeout(() => window.print(), 1000);
+    return;
+}
 
     // Get GPS location for Work Zone Location field
     showNotification('📍 Getting location...', 'info');
