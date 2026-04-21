@@ -1122,7 +1122,8 @@ function getURLParams() {
         layoutId: params.get('layoutId') || params.get('Typical_Layout_ID') || params.get('TypicalLayoutID'),
         layoutTitle: params.get('layoutTitle') || params.get('Typical_Layout_Title') || params.get('TypicalLayoutTitle'),
         roadType: params.get('roadType') || params.get('Road_Type') || params.get('RoadType'),
-        roadComponent: params.get('roadComponent') || params.get('Road_Component') || params.get('RoadComponent')
+        roadComponent: params.get('roadComponent') || params.get('Road_Component') || params.get('RoadComponent'),
+        formId: params.get('formId')
     };
 }
 
@@ -1274,9 +1275,9 @@ async function loadFromGoogleSheets() {
 
 function loadPlanFromURL() {
     const params = getURLParams();
+    currentPlanInfo = params; 
     if (params.planPhoto) {
         currentPlanImageUrl = params.planPhoto;
-        currentPlanInfo = params;
         const cvs = document.getElementById('canvas');
         cvs.style.backgroundImage = `url(${params.planPhoto})`;
         const emptyMsg = cvs.querySelector('#emptyCanvasMsg');
@@ -1284,7 +1285,6 @@ function loadPlanFromURL() {
         showNotification('Traffic plan loaded successfully', 'success');
     }
 }
-
 function populateLayoutDropdown(layouts) {
     const select = document.getElementById('planSelect');
     select.innerHTML = '<option value="">Select Traffic Plan Layout...</option>';
@@ -1313,7 +1313,6 @@ function populateLayoutDropdown(layouts) {
         select.appendChild(optgroup);
     });
 }
-
 function updatePlan() {
     const select = document.getElementById('planSelect');
     const cvs = document.getElementById('canvas');
@@ -1323,6 +1322,7 @@ function updatePlan() {
         if (imageUrl) {
             currentPlanImageUrl = imageUrl;
             currentPlanInfo = {
+                ...currentPlanInfo,           
                 layoutId: select.value,
                 layoutTitle: selectedOption.dataset.title,
                 roadType: selectedOption.dataset.roadType,
