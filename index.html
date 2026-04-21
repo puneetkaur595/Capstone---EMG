@@ -1596,10 +1596,10 @@ function goBackToDesign() {
 --------------------------- */
 function initAnnotationCanvas() {
     const baseCanvas = document.getElementById('baseCanvas');
-    const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true });
+    const baseCtx = baseCanvas.getContext('2d');
 
     canvas = document.getElementById('annotationCanvas');
-    ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx = canvas.getContext('2d');
 
     const container = canvas.parentElement;
     const width = container.clientWidth;
@@ -2107,37 +2107,24 @@ function downloadPlan() {
     
     let base64data;
     try {
-        base64data = compositeCanvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+       base64data = compositeCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
     } catch (error) {
         console.log('CORS blocked canvas export:', error);
         showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
         setTimeout(() => window.print(), 1000);
         return;
     }
-
-    // Try to get GPS location for Work Zone Location field
-    showNotification('📍 Getting location...', 'info');
-    let locationStr = '43.6532,-79.3832'; // default: Toronto
-    try {
-        const pos = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-        });
-        locationStr = `${pos.coords.latitude},${pos.coords.longitude}`;
-        console.log('Location captured:', locationStr);
-    } catch (e) {
-        console.log('Location unavailable, using default:', e.message);
-    }
-
-    uploadToBackend(base64data, locationStr);
+    
+    uploadToBackend(base64data);
 }
 
-async function uploadToBackend(base64Image, locationStr) {
+async function uploadToBackend(base64Image) {
     try {
         showNotification('📤 Uploading...', 'info');
         
         const payload = {
             planImageBase64: base64Image,
-            planInfo: { ...currentPlanInfo, workZoneLocation: locationStr || '43.6532,-79.3832' },
+            planInfo: currentPlanInfo,
             placedSigns: placedSigns.map(s => ({
                 id: s.id,
                 name: s.name,
