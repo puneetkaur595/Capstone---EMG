@@ -1169,6 +1169,9 @@ function escapeHtml(s) {
         '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[m]));
 }
+function isGitHubUrl(url) {
+    return url && (url.includes('raw.githubusercontent.com') || url.includes('github.io'));
+}
 
 function parseSignRows(rows) {
     const signs = [];
@@ -1205,7 +1208,8 @@ function parseSignRows(rows) {
             name: name.toString().trim(),
             category: category ? category.toString().trim() : '',
             url: imageUrl,
-            fileId: fileIdCol ? fileIdCol.toString().trim() : null
+            fileId: fileIdCol ? fileIdCol.toString().trim() : null,
+            isGitHub: isGitHubUrl(imageUrl)
         });
     });
     return signs;
@@ -1355,13 +1359,12 @@ function loadSignLibrary(signs) {
 
         const img = document.createElement('img');
         img.alt = sign.id;
-        img.crossOrigin = 'anonymous'; // ← FIX 1: ensure CORS-clean cache entry
+        if (sign.isGitHub) img.crossOrigin = 'anonymous';
         img.src = sign.url || '';
         img.loading = 'lazy';
         img.onerror = function() {
             if (!this.dataset.retried && sign.fileId) {
                 this.dataset.retried = 'true';
-                this.crossOrigin = 'anonymous';
                 this.src = `https://lh3.googleusercontent.com/d/${sign.fileId}=w400`;
             }
         };
@@ -1462,12 +1465,11 @@ function renderSign(signData) {
 
     const img = document.createElement('img');
     img.alt = signData.id;
-    img.crossOrigin = 'anonymous'; // ← FIX 2: placed signs also need CORS attribute
+    if (signData.isGitHub) img.crossOrigin = 'anonymous';
     img.src = signData.url;
     img.onerror = function() {
         if (!this.dataset.retried && signData.fileId) {
             this.dataset.retried = 'true';
-            this.crossOrigin = 'anonymous';
             this.src = `https://lh3.googleusercontent.com/d/${signData.fileId}=w400`;
         }
     };
@@ -1643,7 +1645,7 @@ async function captureDesignAsBackground(baseCanvas, baseCtx) {
     }
 }
 
-// ← FIX 3: Always re-fetch via drawSignFromUrl (which uses crossOrigin='anonymous')
+
 //    instead of reusing DOM <img> elements that may have been cached without CORS headers.
 async function drawPlacedSignsOnCanvas(baseCanvas, baseCtx) {
     for (const sign of placedSigns) {
@@ -1658,7 +1660,7 @@ async function drawPlacedSignsOnCanvas(baseCanvas, baseCtx) {
 async function drawSignFromUrl(ctx, sign) {
     return new Promise((resolve) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous'; // ← always set before src
+       if (sign.isGitHub) img.crossOrigin = 'anonymous';
         img.onload = function() {
             try {
                 ctx.drawImage(img, -35, -35, 70, 70);
@@ -2071,27 +2073,18 @@ function clearAnnotations() {
     showNotification('Annotations cleared', 'info');
 }
 
-function downloadPlan() {
-    if (!BACKEND_API_URL || BACKEND_API_URL === 'YOUR_CLOUDFLARE_WORKER_URL_HERE') {
-        showNotification('⚠️ Cloudflare Worker not configured. Opening print dialog...', 'error');
-        setTimeout(() => window.print(), 1000);
-        return;
-    }
-    
+async function downloadPlan() {
     showNotification('🔄 Generating traffic plan...', 'info');
-    
+
     const baseCanvas = document.getElementById('baseCanvas');
     const annotationCanvas = document.getElementById('annotationCanvas');
-    
     const compositeCanvas = document.createElement('canvas');
     compositeCanvas.width = baseCanvas.width;
     compositeCanvas.height = baseCanvas.height;
     const compositeCtx = compositeCanvas.getContext('2d');
-    
     compositeCtx.drawImage(baseCanvas, 0, 0);
     compositeCtx.drawImage(annotationCanvas, 0, 0);
-    
-    // Draw text boxes onto composite
+
     const allTextBoxes = document.querySelectorAll('.text-box');
     allTextBoxes.forEach(tb => {
         const left = parseInt(tb.style.left) || 0;
@@ -2099,32 +2092,42 @@ function downloadPlan() {
         const text = tb.innerText.replace(/×\s*$/, '').trim();
         const fontSize = tb.style.fontSize || '16px';
         const color = tb.style.color || '#000';
-        
         compositeCtx.font = `600 ${fontSize} "Segoe UI", system-ui, sans-serif`;
         compositeCtx.fillStyle = color;
         compositeCtx.fillText(text, left, top + 20);
     });
-    
+
     let base64data;
     try {
-       base64data = compositeCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+        base64data = compositeCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
     } catch (error) {
         console.log('CORS blocked canvas export:', error);
         showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
         setTimeout(() => window.print(), 1000);
         return;
     }
-    
-    uploadToBackend(base64data);
+
+    // Get GPS location for Work Zone Location field
+    showNotification('📍 Getting location...', 'info');
+    let locationStr = '43.6532,-79.3832'; // default: Toronto
+    try {
+        const pos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+        });
+        locationStr = `${pos.coords.latitude},${pos.coords.longitude}`;
+    } catch (e) {
+        console.log('Location unavailable, using default:', e.message);
+    }
+
+    uploadToBackend(base64data, locationStr);
 }
 
-async function uploadToBackend(base64Image) {
+async function uploadToBackend(base64Image, locationStr) {
     try {
         showNotification('📤 Uploading...', 'info');
-        
         const payload = {
             planImageBase64: base64Image,
-            planInfo: currentPlanInfo,
+            planInfo: { ...currentPlanInfo, workZoneLocation: locationStr || '43.6532,-79.3832' },
             placedSigns: placedSigns.map(s => ({
                 id: s.id,
                 name: s.name,
@@ -2133,15 +2136,12 @@ async function uploadToBackend(base64Image) {
                 rotation: s.rotation
             }))
         };
-        
         const response = await fetch(BACKEND_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        
         const result = await response.json();
-        
         if (result.success) {
             showNotification('✅ Traffic plan saved successfully! Check your AppSheet app.', 'success');
         } else {
@@ -2149,7 +2149,6 @@ async function uploadToBackend(base64Image) {
             showNotification('❌ Upload failed: ' + (result.error || 'Unknown error'), 'error');
             setTimeout(() => window.print(), 1000);
         }
-        
     } catch (error) {
         console.error('Error uploading to backend:', error);
         showNotification('❌ Upload failed. Opening print dialog instead...', 'error');
