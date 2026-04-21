@@ -1597,11 +1597,33 @@ function goBackToDesign() {
    ANNOTATION CANVAS SETUP
 --------------------------- */
 function initAnnotationCanvas() {
+   function initAnnotationCanvas() {
     const baseCanvas = document.getElementById('baseCanvas');
-    const baseCtx = baseCanvas.getContext('2d');
+    const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true });
 
     canvas = document.getElementById('annotationCanvas');
-    ctx = canvas.getContext('2d');
+    ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const container = canvas.parentElement;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    // Use device pixel ratio for sharper output
+    const dpr = window.devicePixelRatio || 1;
+
+    baseCanvas.width = width * dpr;
+    baseCanvas.height = height * dpr;
+    baseCanvas.style.width = width + 'px';
+    baseCanvas.style.height = height + 'px';
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    // Scale all drawing operations by dpr
+    baseCtx.scale(dpr, dpr);
+    ctx.scale(dpr, dpr);
 
     const container = canvas.parentElement;
     const width = container.clientWidth;
