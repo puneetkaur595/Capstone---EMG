@@ -2099,7 +2099,12 @@ async function downloadPlan() {
 
     let base64data;
     try {
-        base64data = compositeCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+        const scaledCanvas = document.createElement('canvas');
+scaledCanvas.width = Math.round(compositeCanvas.width * 0.5);
+scaledCanvas.height = Math.round(compositeCanvas.height * 0.5);
+const scaledCtx = scaledCanvas.getContext('2d');
+scaledCtx.drawImage(compositeCanvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+base64data = scaledCanvas.toDataURL('image/jpeg', 0.4).split(',')[1];
     } catch (error) {
         console.log('CORS blocked canvas export:', error);
         showNotification('❌ Cannot generate image due to browser security. Opening print dialog...', 'error');
